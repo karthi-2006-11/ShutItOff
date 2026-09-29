@@ -1,48 +1,22 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
-import 'data/db_helper.dart';
 import 'screens/escalation_overlay.dart';
 import 'screens/eye_clock_widget.dart';
 import 'screens/hostel_hub_screen.dart';
 import 'screens/network_hud_widget.dart';
-import 'screens/onboarding_splash_screen.dart';
 import 'screens/pairing_screen.dart';
+import 'screens/splash_anim_screen.dart';
 import 'services/alarm_service.dart';
 import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AlarmService.initialize();
-  final bool onboardingComplete = await DBHelper.instance.isOnboardingComplete();
-  runApp(ShutItOffApp(initialOnboardingComplete: onboardingComplete));
+  runApp(const ShutItOffApp());
 }
 
-class ShutItOffApp extends StatefulWidget {
-  final bool initialOnboardingComplete;
-
-  const ShutItOffApp({
-    super.key,
-    this.initialOnboardingComplete = false,
-  });
-
-  @override
-  State<ShutItOffApp> createState() => _ShutItOffAppState();
-}
-
-class _ShutItOffAppState extends State<ShutItOffApp> {
-  late bool _onboardingDone;
-
-  @override
-  void initState() {
-    super.initState();
-    _onboardingDone = widget.initialOnboardingComplete;
-  }
-
-  void _markOnboardingComplete() {
-    setState(() {
-      _onboardingDone = true;
-    });
-  }
+class ShutItOffApp extends StatelessWidget {
+  const ShutItOffApp({super.key});
 
   @override
   Widget build(BuildContext context) {
@@ -51,11 +25,7 @@ class _ShutItOffAppState extends State<ShutItOffApp> {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
-      home: _onboardingDone
-          ? const AlarmHomeScreen()
-          : OnboardingSplashScreen(
-              onComplete: _markOnboardingComplete,
-            ),
+      home: const SplashAnimScreen(),
     );
   }
 }
