@@ -143,6 +143,9 @@ class AlarmController extends ChangeNotifier {
           if (socketHub.connectedPeerIp != null) {
             peerCheaterSystemAlarms.remove(socketHub.connectedPeerIp!);
           }
+          peerCheaterSystemAlarms.removeWhere((key, value) =>
+              key.toLowerCase() == sender.toLowerCase() ||
+              !isWithinMorningWindow(value));
         }
         notifyListeners();
       } else if (event == SocketHub.eventVersionCheck || event == eventVersionCheck) {
@@ -494,14 +497,18 @@ class AlarmController extends ChangeNotifier {
       final parts = timeStr.trim().split(' ');
       if (parts.length < 2) return false;
       final timeParts = parts[0].split(':');
+      if (timeParts.length < 2) return false;
       var hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
       final period = parts[1].toUpperCase();
       if (period == 'PM' && hour != 12) {
         hour += 12;
       } else if (period == 'AM' && hour == 12) {
         hour = 0;
       }
-      return hour >= 4 && hour <= 7;
+      final totalMinutes = hour * 60 + minute;
+      // Strict minute-by-minute window: 04:00 (240m) up to and including 07:00 (420m)
+      return totalMinutes >= (4 * 60) && totalMinutes <= (7 * 60);
     } catch (_) {
       return false;
     }
@@ -539,21 +546,27 @@ class AlarmController extends ChangeNotifier {
   }
 
   String? getCheaterSystemAlarm([String? peerKey]) {
+    // Purge any alarms outside the 4:00 AM - 7:00 AM minute window
+    peerCheaterSystemAlarms.removeWhere((key, value) => !isWithinMorningWindow(value));
+
     if (peerKey != null && peerCheaterSystemAlarms.containsKey(peerKey)) {
-      return peerCheaterSystemAlarms[peerKey];
+      final val = peerCheaterSystemAlarms[peerKey];
+      return (val != null && isWithinMorningWindow(val)) ? val : null;
     }
     if (peerKey != null) {
       for (final entry in peerCheaterSystemAlarms.entries) {
         if (entry.key.toLowerCase() == peerKey.toLowerCase()) {
-          return entry.value;
+          return isWithinMorningWindow(entry.value) ? entry.value : null;
         }
       }
     }
     if (peerCheaterSystemAlarms.containsKey('default')) {
-      return peerCheaterSystemAlarms['default'];
+      final val = peerCheaterSystemAlarms['default'];
+      return (val != null && isWithinMorningWindow(val)) ? val : null;
     }
     if (peerCheaterSystemAlarms.isNotEmpty) {
-      return peerCheaterSystemAlarms.values.first;
+      final val = peerCheaterSystemAlarms.values.first;
+      return isWithinMorningWindow(val) ? val : null;
     }
     return null;
   }

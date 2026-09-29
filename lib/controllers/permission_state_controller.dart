@@ -32,14 +32,18 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
       final parts = timeStr.trim().split(' ');
       if (parts.length < 2) return false;
       final timeParts = parts[0].split(':');
+      if (timeParts.length < 2) return false;
       var hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
       final period = parts[1].toUpperCase();
       if (period == 'PM' && hour != 12) {
         hour += 12;
       } else if (period == 'AM' && hour == 12) {
         hour = 0;
       }
-      return hour >= 4 && hour <= 7;
+      final totalMinutes = hour * 60 + minute;
+      // Strict minute-by-minute window: 04:00 (240m) up to and including 07:00 (420m)
+      return totalMinutes >= (4 * 60) && totalMinutes <= (7 * 60);
     } catch (_) {
       return false;
     }

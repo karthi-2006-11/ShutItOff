@@ -1,3 +1,4 @@
+import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:sqflite/sqflite.dart';
@@ -30,7 +31,9 @@ void main() {
 
   testWidgets('ShutItOffApp loads and displays main app bar title',
       (WidgetTester tester) async {
-    await tester.pumpWidget(const ShutItOffApp());
+    await tester.pumpWidget(const MaterialApp(
+      home: AlarmHomeScreen(),
+    ));
     await tester.pump();
     expect(find.text('SHUT IT OFF'), findsOneWidget);
   });

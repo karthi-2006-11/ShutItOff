@@ -98,18 +98,19 @@ class MainActivity : FlutterActivity() {
                                 timeZone = deviceTimeZone
                                 timeInMillis = triggerTime
                             }
-                            // Extract exact upcoming alarm hour integer in 24-hour format
+                            // Extract exact upcoming alarm hour and minute in 24-hour format
                             val hourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
+                            val minute = calendar.get(Calendar.MINUTE)
+                            val minuteOfDay = hourOfDay * 60 + minute
 
-                            // Morning Timeframe Gatekeeper: 4:00 AM (04:00) to 7:00 AM (07:00) inclusive
-                            if (hourOfDay in 4..7) {
-                                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault()).apply {
-                                    timeZone = deviceTimeZone
-                                }
+                            // Minute-by-minute Morning Timeframe Gatekeeper: 4:00 AM (240m) up to and including 7:00 AM (420m)
+                            if (minuteOfDay in (4 * 60)..(7 * 60)) {
+                                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                                sdf.timeZone = deviceTimeZone
                                 val formatted = sdf.format(calendar.time)
                                 result.success(formatted)
                             } else {
-                                // Outside 4am-7am window (e.g. 11:00 PM / 23:00) -> treat as empty string / no conflict
+                                // Outside 4:00 AM - 7:00 AM window (e.g., 11:00 PM (23:00) / 07:01 AM) -> IGNORE (Return empty string, no alert)
                                 result.success("")
                             }
                         } else {

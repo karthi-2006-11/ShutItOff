@@ -74,5 +74,17 @@ void main() {
       expect(controller.isCurrentlyRinging, isFalse);
       expect(controller.activeRingingAlarmId, isNull);
     });
+
+    test('isWithinMorningWindow evaluates minute-by-minute 4:00 AM - 7:00 AM window', () {
+      expect(AlarmController.isWithinMorningWindow('06:30 AM'), isTrue);
+      expect(AlarmController.isWithinMorningWindow('04:01 AM'), isTrue);
+      expect(AlarmController.isWithinMorningWindow('04:00 AM'), isTrue);
+      expect(AlarmController.isWithinMorningWindow('07:00 AM'), isTrue);
+      expect(AlarmController.isWithinMorningWindow('11:00 PM'), isFalse);
+      expect(AlarmController.isWithinMorningWindow('07:01 AM'), isFalse);
+      expect(AlarmController.isWithinMorningWindow('03:59 AM'), isFalse);
+      expect(AlarmController.isWithinMorningWindow(''), isFalse);
+      expect(AlarmController.isWithinMorningWindow(null), isFalse);
+    });
   });
 }

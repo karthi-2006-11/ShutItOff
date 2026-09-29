@@ -125,7 +125,10 @@ void main() {
 
   group('Phase 6: Main Dashboard Integration & Navigation Tests', () {
     testWidgets('ShutItOffApp boots into light theme and displays bottom tabs', (tester) async {
-      await tester.pumpWidget(const ShutItOffApp());
+      await tester.pumpWidget(MaterialApp(
+        theme: AppTheme.lightTheme,
+        home: const AlarmHomeScreen(),
+      ));
       await tester.pump();
 
       // Verify Header

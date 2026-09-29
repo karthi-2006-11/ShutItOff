@@ -216,7 +216,34 @@ class SocketHub extends ChangeNotifier {
     _sendJsonPayload(payload);
   }
 
+  static bool isWithinMorningWindow(String? timeStr) {
+    if (timeStr == null || timeStr.trim().isEmpty) return false;
+    try {
+      final parts = timeStr.trim().split(' ');
+      if (parts.length < 2) return false;
+      final timeParts = parts[0].split(':');
+      if (timeParts.length < 2) return false;
+      var hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+      final period = parts[1].toUpperCase();
+      if (period == 'PM' && hour != 12) {
+        hour += 12;
+      } else if (period == 'AM' && hour == 12) {
+        hour = 0;
+      }
+      final totalMinutes = hour * 60 + minute;
+      // Strict minute-by-minute window: 04:00 (240m) up to and including 07:00 (420m)
+      return totalMinutes >= (4 * 60) && totalMinutes <= (7 * 60);
+    } catch (_) {
+      return false;
+    }
+  }
+
   void broadcastSystemAlarmAlert(String alarmTime, {String? friendName}) {
+    // Only transmit packet if localized time matches 4 AM - 7 AM minute-level filter (or empty to clear alert)
+    if (alarmTime.isNotEmpty && !isWithinMorningWindow(alarmTime)) {
+      return;
+    }
     final payload = {
       'event': eventSystemAlarmAlert,
       'alarm_time': alarmTime,
