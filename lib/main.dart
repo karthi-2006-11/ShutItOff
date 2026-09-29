@@ -120,28 +120,36 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
           ),
           body: Stack(
             children: [
-              IndexedStack(
-                index: _selectedTabIndex,
+              Column(
                 children: [
-                  // ========================================================
-                  // VIEW PANEL A: THE ALARM CONFIGURATION SCHEDULER VIEW
-                  // ========================================================
-                  _buildSchedulerView(),
+                  if (_alarmController.localSystemAlarmTime != null)
+                    _buildSystemAlarmConflictBanner(_alarmController.localSystemAlarmTime!),
+                  Expanded(
+                    child: IndexedStack(
+                      index: _selectedTabIndex,
+                      children: [
+                        // ========================================================
+                        // VIEW PANEL A: THE ALARM CONFIGURATION SCHEDULER VIEW
+                        // ========================================================
+                        _buildSchedulerView(),
 
-                  // ========================================================
-                  // VIEW PANEL B: THE P2P HANDSHAKE EXCHANGE INPUT
-                  // ========================================================
-                  PairingScreen(
-                    isEmbedded: true,
-                    controller: _alarmController,
-                  ),
+                        // ========================================================
+                        // VIEW PANEL B: THE P2P HANDSHAKE EXCHANGE INPUT
+                        // ========================================================
+                        PairingScreen(
+                          isEmbedded: true,
+                          controller: _alarmController,
+                        ),
 
-                  // ========================================================
-                  // VIEW PANEL C: THE MULTI-PEER HOSTEL HUB TIMELINE MONITOR
-                  // ========================================================
-                  HostelHubScreen(
-                    controller: _alarmController,
-                    isEmbedded: true,
+                        // ========================================================
+                        // VIEW PANEL C: THE MULTI-PEER HOSTEL HUB TIMELINE MONITOR
+                        // ========================================================
+                        HostelHubScreen(
+                          controller: _alarmController,
+                          isEmbedded: true,
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
@@ -227,6 +235,54 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
               : null,
         );
       },
+    );
+  }
+
+  Widget _buildSystemAlarmConflictBanner(String alarmTime) {
+    return Container(
+      width: double.infinity,
+      margin: const EdgeInsets.fromLTRB(16, 12, 16, 6),
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppTheme.cardWhite,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+        boxShadow: const [
+          BoxShadow(
+            color: AppTheme.starkBlack,
+            offset: Offset(3, 3),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: AppTheme.alarmOrange.withValues(alpha: 0.15),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+            ),
+            child: const Icon(Icons.warning_amber_rounded, color: AppTheme.alarmOrange, size: 24),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              '⚠️ CRITICAL CONFLICT: You have an active system alarm scheduled at $alarmTime. Delete it immediately to grant remote management rights!',
+              style: const TextStyle(
+                fontFamily: 'serif',
+                color: AppTheme.starkBlack,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 0.2,
+                height: 1.35,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 

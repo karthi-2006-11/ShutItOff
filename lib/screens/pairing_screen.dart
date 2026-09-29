@@ -100,7 +100,10 @@ class _PairingScreenState extends State<PairingScreen> {
   @override
   Widget build(BuildContext context) {
     final content = ListenableBuilder(
-      listenable: _permissionController,
+      listenable: Listenable.merge([
+        _permissionController,
+        if (widget.controller != null) widget.controller!,
+      ]),
       builder: (context, _) {
         return SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -372,13 +375,19 @@ class _PairingScreenState extends State<PairingScreen> {
         else
           ...devices.map((device) {
             final id = device.id ?? 0;
+            final cheaterAlarmTime = widget.controller?.getCheaterSystemAlarm(device.friendName);
+            final bool isCheater = cheaterAlarmTime != null;
+
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: AppTheme.cardWhite,
+                color: isCheater ? const Color(0xFFFFF8F8) : AppTheme.cardWhite,
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+                border: Border.all(
+                  color: isCheater ? const Color(0xFFD32F2F) : AppTheme.starkBlack,
+                  width: isCheater ? 2.5 : 1.5,
+                ),
                 boxShadow: const [
                   BoxShadow(
                     color: AppTheme.starkBlack,
@@ -399,6 +408,22 @@ class _PairingScreenState extends State<PairingScreen> {
                           children: [
                             Row(
                               children: [
+                                if (isCheater)
+                                  const Padding(
+                                    padding: EdgeInsets.only(right: 6),
+                                    child: FlashingWarningDot(),
+                                  )
+                                else
+                                  Container(
+                                    width: 9,
+                                    height: 9,
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: device.isAuthorized ? AppTheme.successGreen : AppTheme.textMuted,
+                                      border: Border.all(color: AppTheme.starkBlack, width: 1.0),
+                                    ),
+                                  ),
                                 Text(
                                   device.friendName,
                                   style: const TextStyle(
@@ -449,6 +474,8 @@ class _PairingScreenState extends State<PairingScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
+                            if (isCheater)
+                              _buildCheatWarningPanel(device.friendName, cheaterAlarmTime),
                           ],
                         ),
                       ),
@@ -534,6 +561,101 @@ class _PairingScreenState extends State<PairingScreen> {
             );
           }),
       ],
+    );
+  }
+
+  Widget _buildCheatWarningPanel(String friendName, String alarmTime) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+        boxShadow: const [
+          BoxShadow(
+            color: AppTheme.starkBlack,
+            offset: Offset(2, 2),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🚨', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '🚨 CHEATING DETECTED: $friendName has set a hidden background alarm inside their phone\'s default Clock app for $alarmTime! ShutItOff cannot bypass this lock!',
+              style: const TextStyle(
+                fontFamily: 'serif',
+                color: Color(0xFFB71C1C),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class FlashingWarningDot extends StatefulWidget {
+  const FlashingWarningDot({super.key});
+
+  @override
+  State<FlashingWarningDot> createState() => _FlashingWarningDotState();
+}
+
+class _FlashingWarningDotState extends State<FlashingWarningDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _animController;
+  late Animation<double> _opacityAnim;
+
+  @override
+  void initState() {
+    super.initState();
+    _animController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 600),
+    )..repeat(reverse: true);
+    _opacityAnim = Tween<double>(begin: 0.2, end: 1.0).animate(_animController);
+  }
+
+  @override
+  void dispose() {
+    _animController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AnimatedBuilder(
+      animation: _opacityAnim,
+      builder: (context, child) {
+        return Opacity(
+          opacity: _opacityAnim.value,
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: const Color(0xFFD32F2F),
+              border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+              boxShadow: const [
+                BoxShadow(
+                  color: Color(0xFFD32F2F),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

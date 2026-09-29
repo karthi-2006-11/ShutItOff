@@ -1,5 +1,6 @@
 package com.example.shutitoff
 
+import android.app.AlarmManager
 import android.content.Context
 import android.content.Intent
 import android.net.Uri
@@ -9,6 +10,9 @@ import android.provider.Settings
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
+import java.text.SimpleDateFormat
+import java.util.Calendar
+import java.util.Locale
 
 class MainActivity : FlutterActivity() {
     private val PERMISSIONS_CHANNEL = "com.example.shutitoff/permissions"
@@ -76,6 +80,27 @@ class MainActivity : FlutterActivity() {
                         } catch (e2: Exception) {
                             result.error("INTENT_ERROR", e2.localizedMessage, null)
                         }
+                    }
+                }
+                "getNextSystemAlarmClock" -> {
+                    try {
+                        val alarmManager = getSystemService(Context.ALARM_SERVICE) as? AlarmManager
+                        val nextAlarm = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.LOLLIPOP) {
+                            alarmManager?.nextAlarmClock
+                        } else {
+                            null
+                        }
+                        if (nextAlarm != null) {
+                            val triggerTime = nextAlarm.triggerTime
+                            val calendar = Calendar.getInstance().apply { timeInMillis = triggerTime }
+                            val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                            val formatted = sdf.format(calendar.time)
+                            result.success(formatted)
+                        } else {
+                            result.success("")
+                        }
+                    } catch (e: Exception) {
+                        result.success("")
                     }
                 }
                 else -> {

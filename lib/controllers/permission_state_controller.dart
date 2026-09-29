@@ -7,6 +7,7 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
 
   bool isBatteryUnrestricted = false;
   bool isOverlayAllowed = false;
+  String? detectedSystemAlarmTime;
   bool isEvaluating = false;
 
   bool get areAllPermissionsGranted => isBatteryUnrestricted && isOverlayAllowed;
@@ -33,12 +34,15 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         final bool? battery = await _channel.invokeMethod<bool>('isBatteryUnrestricted');
         final bool? overlay = await _channel.invokeMethod<bool>('isOverlayAllowed');
+        final String? systemAlarm = await _channel.invokeMethod<String>('getNextSystemAlarmClock');
         isBatteryUnrestricted = battery ?? false;
         isOverlayAllowed = overlay ?? false;
+        detectedSystemAlarmTime = (systemAlarm != null && systemAlarm.isNotEmpty) ? systemAlarm : null;
       } else {
         // Fallback for non-Android environments (web/preview/tests)
         isBatteryUnrestricted = true;
         isOverlayAllowed = true;
+        detectedSystemAlarmTime = null;
       }
     } catch (e) {
       debugPrint('[PermissionStateController] Evaluation error: $e');

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../controllers/alarm_controller.dart';
 import '../data/db_helper.dart';
 import '../theme/app_theme.dart';
+import 'pairing_screen.dart';
 
 class HostelHubScreen extends StatefulWidget {
   final AlarmController controller;
@@ -438,14 +439,19 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
               children: _pairedDevices.map((device) {
                 final friendName = device['friend_name'] as String? ?? 'Peer';
                 final isAuthorized = device['is_authorized'] == 1;
+                final cheaterAlarmTime = widget.controller.getCheaterSystemAlarm(friendName);
+                final bool isCheater = cheaterAlarmTime != null;
 
                 return Container(
                   margin: const EdgeInsets.only(bottom: 10),
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: AppTheme.cardWhite,
+                    color: isCheater ? const Color(0xFFFFF8F8) : AppTheme.cardWhite,
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+                    border: Border.all(
+                      color: isCheater ? const Color(0xFFD32F2F) : AppTheme.starkBlack,
+                      width: isCheater ? 2.5 : 2.0,
+                    ),
                     boxShadow: const [
                       BoxShadow(
                         color: AppTheme.starkBlack,
@@ -462,12 +468,22 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                         children: [
                           Row(
                             children: [
-                              Icon(
-                                Icons.person,
-                                size: 16,
-                                color: isAuthorized ? AppTheme.starkBlack : AppTheme.textMuted,
-                              ),
-                              const SizedBox(width: 6),
+                              if (isCheater)
+                                const Padding(
+                                  padding: EdgeInsets.only(right: 6),
+                                  child: FlashingWarningDot(),
+                                )
+                              else
+                                Container(
+                                  width: 9,
+                                  height: 9,
+                                  margin: const EdgeInsets.only(right: 6),
+                                  decoration: BoxDecoration(
+                                    shape: BoxShape.circle,
+                                    color: isAuthorized ? AppTheme.successGreen : AppTheme.textMuted,
+                                    border: Border.all(color: AppTheme.starkBlack, width: 1.0),
+                                  ),
+                                ),
                               Text(
                                 '$friendName - ${isAuthorized ? "AUTHORIZED" : "REVOKED"}',
                                 style: const TextStyle(
@@ -503,6 +519,8 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                           ),
                         ],
                       ),
+                      if (isCheater)
+                        _buildCheatWarningPanel(friendName, cheaterAlarmTime),
                       if (isAuthorized) ...[
                         const SizedBox(height: 10),
                         Container(
@@ -753,6 +771,44 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildCheatWarningPanel(String friendName, String alarmTime) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFEBEE),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+        boxShadow: const [
+          BoxShadow(
+            color: AppTheme.starkBlack,
+            offset: Offset(2, 2),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('🚨', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '🚨 CHEATING DETECTED: $friendName has set a hidden background alarm inside their phone\'s default Clock app for $alarmTime! ShutItOff cannot bypass this lock!',
+              style: const TextStyle(
+                fontFamily: 'serif',
+                color: Color(0xFFB71C1C),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

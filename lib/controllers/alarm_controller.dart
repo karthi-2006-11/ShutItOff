@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:isolate';
 import 'dart:ui';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import '../data/db_helper.dart';
 import '../services/alarm_service.dart';
 import '../services/network_discovery.dart';
@@ -27,6 +28,13 @@ class AlarmController extends ChangeNotifier {
   static const String eventPreemptiveSkip = "PREEMPTIVE_SKIP";
   Map<String, List<Map<String, dynamic>>> remotePeerAlarmSchedules = {};
 
+  // Native Android External System Alarm Detection & Cheat Exposure
+  static const String eventSystemAlarmAlert = "SYSTEM_ALARM_ALERT";
+  static const MethodChannel _permissionsChannel = MethodChannel('com.example.shutitoff/permissions');
+  String? localSystemAlarmTime;
+  Map<String, String> peerCheaterSystemAlarms = {};
+  Timer? _systemAlarmTimer;
+
   ReceivePort? _receivePort;
 
   final SocketHub socketHub = SocketHub();
@@ -46,15 +54,27 @@ class AlarmController extends ChangeNotifier {
 
     socketHub.onClientConnected = (_) {
       broadcastAlarmSync();
+      if (localSystemAlarmTime != null) {
+        broadcastSystemAlarmAlert(localSystemAlarmTime!);
+      }
     };
 
     discoveryService.onPeerDiscovered = (peer) {
       socketHub.connectToPeer(peer.ipAddress, port: peer.port).then((connected) {
         if (connected) {
           broadcastAlarmSync();
+          if (localSystemAlarmTime != null) {
+            broadcastSystemAlarmAlert(localSystemAlarmTime!);
+          }
         }
       });
     };
+
+    await checkLocalSystemAlarmAndBroadcast();
+    _systemAlarmTimer?.cancel();
+    _systemAlarmTimer = Timer.periodic(const Duration(seconds: 5), (_) {
+      checkLocalSystemAlarmAndBroadcast();
+    });
   }
 
   void _setupSocketListener() {
@@ -97,6 +117,26 @@ class AlarmController extends ChangeNotifier {
         if (id != null) {
           handlePreemptiveSkip(id, actorName: actor);
         }
+      } else if (event == SocketHub.eventSystemAlarmAlert || event == eventSystemAlarmAlert) {
+        final alarmTime = payload['alarm_time'] as String? ?? '';
+        final sender = payload['friend_name'] as String? ??
+            payload['sender_name'] as String? ??
+            socketHub.connectedPeerIp ??
+            'Roommate';
+        if (alarmTime.isNotEmpty) {
+          peerCheaterSystemAlarms[sender] = alarmTime;
+          peerCheaterSystemAlarms['default'] = alarmTime;
+          if (socketHub.connectedPeerIp != null) {
+            peerCheaterSystemAlarms[socketHub.connectedPeerIp!] = alarmTime;
+          }
+        } else {
+          peerCheaterSystemAlarms.remove(sender);
+          peerCheaterSystemAlarms.remove('default');
+          if (socketHub.connectedPeerIp != null) {
+            peerCheaterSystemAlarms.remove(socketHub.connectedPeerIp!);
+          }
+        }
+        notifyListeners();
       }
     };
   }
@@ -418,6 +458,51 @@ class AlarmController extends ChangeNotifier {
     }
   }
 
+  Future<void> checkLocalSystemAlarmAndBroadcast() async {
+    try {
+      if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
+        final String? result = await _permissionsChannel.invokeMethod<String>('getNextSystemAlarmClock');
+        final formatted = (result != null && result.isNotEmpty) ? result : null;
+        if (formatted != localSystemAlarmTime) {
+          localSystemAlarmTime = formatted;
+          notifyListeners();
+          if (localSystemAlarmTime != null) {
+            broadcastSystemAlarmAlert(localSystemAlarmTime!);
+          } else {
+            socketHub.broadcastSystemAlarmAlert('');
+          }
+        }
+      }
+    } catch (e) {
+      debugPrint('[AlarmController] System alarm check error: $e');
+    }
+  }
+
+  void broadcastSystemAlarmAlert(String alarmTime) {
+    final senderName = activeRoom?['room_name'] ?? 'Host';
+    socketHub.broadcastSystemAlarmAlert(alarmTime, friendName: senderName);
+  }
+
+  String? getCheaterSystemAlarm([String? peerKey]) {
+    if (peerKey != null && peerCheaterSystemAlarms.containsKey(peerKey)) {
+      return peerCheaterSystemAlarms[peerKey];
+    }
+    if (peerKey != null) {
+      for (final entry in peerCheaterSystemAlarms.entries) {
+        if (entry.key.toLowerCase() == peerKey.toLowerCase()) {
+          return entry.value;
+        }
+      }
+    }
+    if (peerCheaterSystemAlarms.containsKey('default')) {
+      return peerCheaterSystemAlarms['default'];
+    }
+    if (peerCheaterSystemAlarms.isNotEmpty) {
+      return peerCheaterSystemAlarms.values.first;
+    }
+    return null;
+  }
+
   @override
   void notifyListeners() {
     if (!_isDisposed) {
@@ -428,6 +513,7 @@ class AlarmController extends ChangeNotifier {
   @override
   void dispose() {
     _isDisposed = true;
+    _systemAlarmTimer?.cancel();
     _escalationTimer?.cancel();
     _receivePort?.close();
     IsolateNameServer.removePortNameMapping(AlarmService.isolatePortName);

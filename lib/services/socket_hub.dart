@@ -19,6 +19,7 @@ class SocketHub extends ChangeNotifier {
   static const String eventForceWake = 'FORCE_WAKE';
   static const String eventAlarmSyncList = 'ALARM_SYNC_LIST';
   static const String eventPreemptiveSkip = 'PREEMPTIVE_SKIP';
+  static const String eventSystemAlarmAlert = 'SYSTEM_ALARM_ALERT';
 
   HttpServer? _server;
   // Step 2 Requirement: Active tracker array list maintaining multi-client connections
@@ -197,6 +198,16 @@ class SocketHub extends ChangeNotifier {
     _sendJsonPayload(payload);
   }
 
+  void broadcastSystemAlarmAlert(String alarmTime, {String? friendName}) {
+    final payload = {
+      'event': eventSystemAlarmAlert,
+      'alarm_time': alarmTime,
+      'friend_name': ?friendName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
   void _sendJsonPayload(Map<String, dynamic> payload) {
     final encoded = jsonEncode(payload);
 
@@ -227,7 +238,8 @@ class SocketHub extends ChangeNotifier {
               event == eventAlarmEscalated ||
               event == eventForceWake ||
               event == eventAlarmSyncList ||
-              event == eventPreemptiveSkip)) {
+              event == eventPreemptiveSkip ||
+              event == eventSystemAlarmAlert)) {
         onEventReceived?.call(event, parsed);
       }
     } catch (e) {
