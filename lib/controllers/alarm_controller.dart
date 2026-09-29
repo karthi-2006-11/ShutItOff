@@ -193,7 +193,14 @@ class AlarmController extends ChangeNotifier {
     isEscalated = false;
     escalatedFriendName = null;
 
+    final SendPort? bgPort =
+        IsolateNameServer.lookupPortByName('shutitoff_background_cmd_port');
+    if (bgPort != null) {
+      bgPort.send('STOP_AUDIO');
+    }
+
     AlarmService.stopRingtone();
+    IsolateNameServer.removePortNameMapping('shutitoff_background_cmd_port');
     AlarmService.cancelNotification(id);
     isCurrentlyRinging = false;
     activeRingingAlarmId = null;
@@ -234,7 +241,14 @@ class AlarmController extends ChangeNotifier {
     isEscalated = false;
     escalatedFriendName = null;
 
+    final SendPort? bgPort =
+        IsolateNameServer.lookupPortByName('shutitoff_background_cmd_port');
+    if (bgPort != null) {
+      bgPort.send('STOP_AUDIO');
+    }
+
     AlarmService.stopRingtone();
+    IsolateNameServer.removePortNameMapping('shutitoff_background_cmd_port');
     AlarmService.cancelNotification(id);
     isCurrentlyRinging = false;
     activeRingingAlarmId = null;
@@ -292,6 +306,7 @@ class AlarmController extends ChangeNotifier {
     _escalationTimer?.cancel();
     _receivePort?.close();
     IsolateNameServer.removePortNameMapping(AlarmService.isolatePortName);
+    IsolateNameServer.removePortNameMapping('shutitoff_background_cmd_port');
     socketHub.dispose();
     discoveryService.dispose();
     super.dispose();

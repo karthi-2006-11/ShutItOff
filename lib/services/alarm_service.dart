@@ -8,6 +8,30 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 @pragma('vm:entry-point')
 void alarmFireCallback(int id) async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Set up an isolated command background listener using a dedicated ReceivePort
+  final ReceivePort backgroundReceivePort = ReceivePort();
+  IsolateNameServer.removePortNameMapping('shutitoff_background_cmd_port');
+  IsolateNameServer.registerPortWithName(
+    backgroundReceivePort.sendPort,
+    'shutitoff_background_cmd_port',
+  );
+
+  backgroundReceivePort.listen((dynamic message) async {
+    if (message == 'STOP_AUDIO') {
+      try {
+        final audioPlayer = AlarmService.audioPlayer;
+        if (audioPlayer != null) {
+          await audioPlayer.stop();
+          await audioPlayer.dispose();
+          AlarmService.audioPlayer = null;
+        }
+      } catch (_) {}
+      backgroundReceivePort.close();
+      IsolateNameServer.removePortNameMapping('shutitoff_background_cmd_port');
+    }
+  });
+
   await AlarmService.playRingtone();
   await AlarmService.showAlarmNotification(id);
 
@@ -17,8 +41,9 @@ void alarmFireCallback(int id) async {
 
 class AlarmService {
   static const String isolatePortName = 'shutitoff_alarm_isolate_port';
+  static const String backgroundCmdPortName = 'shutitoff_background_cmd_port';
   static final FlutterLocalNotificationsPlugin _notificationsPlugin = FlutterLocalNotificationsPlugin();
-  static AudioPlayer? _audioPlayer;
+  static AudioPlayer? audioPlayer;
 
   static Future<void> initialize() async {
     try {
@@ -65,46 +90,46 @@ class AlarmService {
 
   static Future<void> playRingtone() async {
     try {
-      _audioPlayer ??= AudioPlayer();
-      await _audioPlayer!.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer!.setVolume(1.0);
-      await _audioPlayer!.play(AssetSource('audio/alarm.mp3'));
+      audioPlayer ??= AudioPlayer();
+      await audioPlayer!.setReleaseMode(ReleaseMode.loop);
+      await audioPlayer!.setVolume(1.0);
+      await audioPlayer!.play(AssetSource('audio/alarm.mp3'));
     } catch (_) {
       try {
-        _audioPlayer ??= AudioPlayer();
-        await _audioPlayer!.setReleaseMode(ReleaseMode.loop);
-        await _audioPlayer!.play(AssetSource('audio/alarm.wav'));
+        audioPlayer ??= AudioPlayer();
+        await audioPlayer!.setReleaseMode(ReleaseMode.loop);
+        await audioPlayer!.play(AssetSource('audio/alarm.wav'));
       } catch (_) {}
     }
   }
 
   static Future<void> forceMaxVolumeFranticMode() async {
     try {
-      _audioPlayer ??= AudioPlayer();
-      await _audioPlayer!.setReleaseMode(ReleaseMode.loop);
+      audioPlayer ??= AudioPlayer();
+      await audioPlayer!.setReleaseMode(ReleaseMode.loop);
       // Force audioplayers stream to 1.0 (100% max volume)
-      await _audioPlayer!.setVolume(1.0);
+      await audioPlayer!.setVolume(1.0);
       // Toggle tone into frantic max-frequency state (accelerated frantic siren pattern)
-      await _audioPlayer!.setPlaybackRate(1.5);
-      if (_audioPlayer!.state != PlayerState.playing) {
-        await _audioPlayer!.play(AssetSource('audio/alarm.mp3'));
+      await audioPlayer!.setPlaybackRate(1.5);
+      if (audioPlayer!.state != PlayerState.playing) {
+        await audioPlayer!.play(AssetSource('audio/alarm.mp3'));
       }
     } catch (_) {
       try {
-        await _audioPlayer?.play(AssetSource('audio/alarm.wav'));
+        await audioPlayer?.play(AssetSource('audio/alarm.wav'));
       } catch (_) {}
     }
   }
 
   static Future<void> stopRingtone() async {
     try {
-      if (_audioPlayer != null) {
+      if (audioPlayer != null) {
         try {
-          await _audioPlayer!.setPlaybackRate(1.0);
+          await audioPlayer!.setPlaybackRate(1.0);
         } catch (_) {}
-        await _audioPlayer!.stop();
-        await _audioPlayer!.dispose();
-        _audioPlayer = null;
+        await audioPlayer!.stop();
+        await audioPlayer!.dispose();
+        audioPlayer = null;
       }
     } catch (_) {}
   }
