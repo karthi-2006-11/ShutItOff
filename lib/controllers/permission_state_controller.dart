@@ -8,6 +8,8 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
   bool isBatteryUnrestricted = false;
   bool isOverlayAllowed = false;
   String? detectedSystemAlarmTime;
+  String? get localSystemAlarmTime => detectedSystemAlarmTime;
+  set localSystemAlarmTime(String? value) => detectedSystemAlarmTime = value;
   bool isEvaluating = false;
 
   bool get areAllPermissionsGranted => isBatteryUnrestricted && isOverlayAllowed;
@@ -26,27 +28,50 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
     }
   }
 
-  static bool isWithinMorningWindow(String? timeStr) {
-    if (timeStr == null || timeStr.trim().isEmpty) return false;
-    try {
-      final parts = timeStr.trim().split(' ');
-      if (parts.length < 2) return false;
-      final timeParts = parts[0].split(':');
-      if (timeParts.length < 2) return false;
-      var hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-      final period = parts[1].toUpperCase();
-      if (period == 'PM' && hour != 12) {
-        hour += 12;
-      } else if (period == 'AM' && hour == 12) {
-        hour = 0;
-      }
-      final totalMinutes = hour * 60 + minute;
-      // Strict minute-by-minute window: 04:00 (240m) up to and including 07:00 (420m)
-      return totalMinutes >= (4 * 60) && totalMinutes <= (7 * 60);
-    } catch (_) {
-      return false;
+  static ({bool isCheating, String formattedTime}) parseSystemAlarmString(String? raw) {
+    if (raw == null || raw.trim().isEmpty) {
+      return (isCheating: false, formattedTime: '');
     }
+    try {
+      final trimmed = raw.trim();
+      int hour24;
+      int minute;
+      String formattedTime;
+
+      if (trimmed.contains(',')) {
+        // Kotlin returned "hour24,minute,formattedTime" (e.g., "6,30,06:30 AM")
+        final parts = trimmed.split(',');
+        hour24 = int.parse(parts[0].trim());
+        minute = int.parse(parts[1].trim());
+        formattedTime = parts.sublist(2).join(',').trim();
+      } else {
+        // Fallback for standard formatted string e.g. "06:30 AM"
+        final parts = trimmed.split(' ');
+        if (parts.length < 2) return (isCheating: false, formattedTime: '');
+        final timeParts = parts[0].split(':');
+        if (timeParts.length < 2) return (isCheating: false, formattedTime: '');
+        var h = int.parse(timeParts[0]);
+        minute = int.parse(timeParts[1]);
+        final period = parts[1].toUpperCase();
+        if (period == 'PM' && h != 12) {
+          h += 12;
+        } else if (period == 'AM' && h == 12) {
+          h = 0;
+        }
+        hour24 = h;
+        formattedTime = trimmed;
+      }
+
+      // Math Logic: bool isCheating = (hour24 >= 4 && hour24 <= 6) || (hour24 == 7 && minute == 0);
+      final bool isCheating = (hour24 >= 4 && hour24 <= 6) || (hour24 == 7 && minute == 0);
+      return (isCheating: isCheating, formattedTime: formattedTime);
+    } catch (_) {
+      return (isCheating: false, formattedTime: '');
+    }
+  }
+
+  static bool isWithinMorningWindow(String? timeStr) {
+    return parseSystemAlarmString(timeStr).isCheating;
   }
 
   Future<void> evaluateCurrentDevicePermissions() async {
@@ -57,11 +82,13 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         final bool? battery = await _channel.invokeMethod<bool>('isBatteryUnrestricted');
         final bool? overlay = await _channel.invokeMethod<bool>('isOverlayAllowed');
-        final String? systemAlarm = await _channel.invokeMethod<String>('getNextSystemAlarmClock');
+        final String? rawAlarm = await _channel.invokeMethod<String>('getNextSystemAlarmClock');
         isBatteryUnrestricted = battery ?? false;
         isOverlayAllowed = overlay ?? false;
-        if (systemAlarm != null && systemAlarm.isNotEmpty && isWithinMorningWindow(systemAlarm)) {
-          detectedSystemAlarmTime = systemAlarm;
+
+        final parsed = parseSystemAlarmString(rawAlarm);
+        if (parsed.isCheating) {
+          detectedSystemAlarmTime = parsed.formattedTime;
         } else {
           detectedSystemAlarmTime = null;
         }

@@ -92,27 +92,17 @@ class MainActivity : FlutterActivity() {
                             null
                         }
                         if (nextAlarm != null) {
-                            val triggerTime = nextAlarm.triggerTime
-                            val deviceTimeZone = TimeZone.getDefault()
-                            val calendar = Calendar.getInstance(deviceTimeZone).apply {
-                                timeZone = deviceTimeZone
-                                timeInMillis = triggerTime
-                            }
-                            // Extract exact upcoming alarm hour and minute in 24-hour format
-                            val hourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
-                            val minute = calendar.get(Calendar.MINUTE)
-                            val minuteOfDay = hourOfDay * 60 + minute
+                            val calendar = Calendar.getInstance(TimeZone.getDefault())
+                            calendar.timeInMillis = nextAlarm.triggerTime
 
-                            // Minute-by-minute Morning Timeframe Gatekeeper: 4:00 AM (240m) up to and including 7:00 AM (420m)
-                            if (minuteOfDay in (4 * 60)..(7 * 60)) {
-                                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-                                sdf.timeZone = deviceTimeZone
-                                val formatted = sdf.format(calendar.time)
-                                result.success(formatted)
-                            } else {
-                                // Outside 4:00 AM - 7:00 AM window (e.g., 11:00 PM (23:00) / 07:01 AM) -> IGNORE (Return empty string, no alert)
-                                result.success("")
-                            }
+                            val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
+                            sdf.timeZone = TimeZone.getDefault()
+                            val formattedTime = sdf.format(calendar.time)
+
+                            val hour24 = calendar.get(Calendar.HOUR_OF_DAY)
+                            val minute = calendar.get(Calendar.MINUTE)
+
+                            result.success("$hour24,$minute,$formattedTime")
                         } else {
                             result.success("")
                         }

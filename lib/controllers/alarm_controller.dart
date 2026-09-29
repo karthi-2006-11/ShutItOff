@@ -7,6 +7,7 @@ import '../data/db_helper.dart';
 import '../services/alarm_service.dart';
 import '../services/network_discovery.dart';
 import '../services/socket_hub.dart';
+import 'permission_state_controller.dart';
 
 class AlarmController extends ChangeNotifier {
   bool isCurrentlyRinging = false;
@@ -61,9 +62,7 @@ class AlarmController extends ChangeNotifier {
     socketHub.onClientConnected = (_) {
       socketHub.sendVersionCheck(currentProtocolVersion, activeRoom?['room_name'] ?? 'Host');
       broadcastAlarmSync();
-      if (localSystemAlarmTime != null) {
-        broadcastSystemAlarmAlert(localSystemAlarmTime!);
-      }
+      broadcastSystemAlarmAlert(localSystemAlarmTime ?? '');
     };
 
     discoveryService.onPeerDiscovered = (peer) {
@@ -71,9 +70,7 @@ class AlarmController extends ChangeNotifier {
         if (connected) {
           socketHub.sendVersionCheck(currentProtocolVersion, activeRoom?['room_name'] ?? 'Host');
           broadcastAlarmSync();
-          if (localSystemAlarmTime != null) {
-            broadcastSystemAlarmAlert(localSystemAlarmTime!);
-          }
+          broadcastSystemAlarmAlert(localSystemAlarmTime ?? '');
         }
       });
     };
@@ -126,16 +123,17 @@ class AlarmController extends ChangeNotifier {
           handlePreemptiveSkip(id, actorName: actor);
         }
       } else if (event == SocketHub.eventSystemAlarmAlert || event == eventSystemAlarmAlert) {
-        final alarmTime = payload['alarm_time'] as String? ?? '';
+        final rawAlarm = payload['alarm_time'] as String? ?? '';
         final sender = payload['friend_name'] as String? ??
             payload['sender_name'] as String? ??
             socketHub.connectedPeerIp ??
             'Roommate';
-        if (alarmTime.isNotEmpty && isWithinMorningWindow(alarmTime)) {
-          peerCheaterSystemAlarms[sender] = alarmTime;
-          peerCheaterSystemAlarms['default'] = alarmTime;
+        final parsed = parseSystemAlarmString(rawAlarm);
+        if (parsed.isCheating && parsed.formattedTime.isNotEmpty) {
+          peerCheaterSystemAlarms[sender] = parsed.formattedTime;
+          peerCheaterSystemAlarms['default'] = parsed.formattedTime;
           if (socketHub.connectedPeerIp != null) {
-            peerCheaterSystemAlarms[socketHub.connectedPeerIp!] = alarmTime;
+            peerCheaterSystemAlarms[socketHub.connectedPeerIp!] = parsed.formattedTime;
           }
         } else {
           peerCheaterSystemAlarms.remove(sender);
@@ -145,7 +143,7 @@ class AlarmController extends ChangeNotifier {
           }
           peerCheaterSystemAlarms.removeWhere((key, value) =>
               key.toLowerCase() == sender.toLowerCase() ||
-              !isWithinMorningWindow(value));
+              !parseSystemAlarmString(value).isCheating);
         }
         notifyListeners();
       } else if (event == SocketHub.eventVersionCheck || event == eventVersionCheck) {
@@ -156,7 +154,7 @@ class AlarmController extends ChangeNotifier {
             'Roommate';
         peerVersions[sender] = version;
         peerVersions['default'] = version;
-        if (isVersionOlder(version, currentProtocolVersion)) {
+        if (version != currentProtocolVersion || isVersionOlder(version, currentProtocolVersion)) {
           peerProtocolStatus[sender] = "OUTDATED_PROTOCOL";
           peerProtocolStatus['default'] = "OUTDATED_PROTOCOL";
           if (socketHub.connectedPeerIp != null) {
@@ -491,35 +489,21 @@ class AlarmController extends ChangeNotifier {
     }
   }
 
+  static ({bool isCheating, String formattedTime}) parseSystemAlarmString(String? raw) {
+    return PermissionStateController.parseSystemAlarmString(raw);
+  }
+
   static bool isWithinMorningWindow(String? timeStr) {
-    if (timeStr == null || timeStr.trim().isEmpty) return false;
-    try {
-      final parts = timeStr.trim().split(' ');
-      if (parts.length < 2) return false;
-      final timeParts = parts[0].split(':');
-      if (timeParts.length < 2) return false;
-      var hour = int.parse(timeParts[0]);
-      final minute = int.parse(timeParts[1]);
-      final period = parts[1].toUpperCase();
-      if (period == 'PM' && hour != 12) {
-        hour += 12;
-      } else if (period == 'AM' && hour == 12) {
-        hour = 0;
-      }
-      final totalMinutes = hour * 60 + minute;
-      // Strict minute-by-minute window: 04:00 (240m) up to and including 07:00 (420m)
-      return totalMinutes >= (4 * 60) && totalMinutes <= (7 * 60);
-    } catch (_) {
-      return false;
-    }
+    return PermissionStateController.isWithinMorningWindow(timeStr);
   }
 
   Future<void> checkLocalSystemAlarmAndBroadcast() async {
     try {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-        final String? result = await _permissionsChannel.invokeMethod<String>('getNextSystemAlarmClock');
-        final formatted = (result != null && result.isNotEmpty && isWithinMorningWindow(result))
-            ? result
+        final String? rawResult = await _permissionsChannel.invokeMethod<String>('getNextSystemAlarmClock');
+        final parsed = parseSystemAlarmString(rawResult);
+        final formatted = (parsed.isCheating && parsed.formattedTime.isNotEmpty)
+            ? parsed.formattedTime
             : null;
         if (formatted != localSystemAlarmTime) {
           localSystemAlarmTime = formatted;
