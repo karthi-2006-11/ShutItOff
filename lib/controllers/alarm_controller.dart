@@ -35,6 +35,12 @@ class AlarmController extends ChangeNotifier {
   Map<String, String> peerCheaterSystemAlarms = {};
   Timer? _systemAlarmTimer;
 
+  // Protocol Version Check Guard
+  static const String currentProtocolVersion = "1.1.0";
+  static const String eventVersionCheck = "VERSION_CHECK";
+  Map<String, String> peerProtocolStatus = {};
+  Map<String, String> peerVersions = {};
+
   ReceivePort? _receivePort;
 
   final SocketHub socketHub = SocketHub();
@@ -53,6 +59,7 @@ class AlarmController extends ChangeNotifier {
     await loadActiveRoom();
 
     socketHub.onClientConnected = (_) {
+      socketHub.sendVersionCheck(currentProtocolVersion, activeRoom?['room_name'] ?? 'Host');
       broadcastAlarmSync();
       if (localSystemAlarmTime != null) {
         broadcastSystemAlarmAlert(localSystemAlarmTime!);
@@ -62,6 +69,7 @@ class AlarmController extends ChangeNotifier {
     discoveryService.onPeerDiscovered = (peer) {
       socketHub.connectToPeer(peer.ipAddress, port: peer.port).then((connected) {
         if (connected) {
+          socketHub.sendVersionCheck(currentProtocolVersion, activeRoom?['room_name'] ?? 'Host');
           broadcastAlarmSync();
           if (localSystemAlarmTime != null) {
             broadcastSystemAlarmAlert(localSystemAlarmTime!);
@@ -134,6 +142,28 @@ class AlarmController extends ChangeNotifier {
           peerCheaterSystemAlarms.remove('default');
           if (socketHub.connectedPeerIp != null) {
             peerCheaterSystemAlarms.remove(socketHub.connectedPeerIp!);
+          }
+        }
+        notifyListeners();
+      } else if (event == SocketHub.eventVersionCheck || event == eventVersionCheck) {
+        final version = payload['version'] as String? ?? '1.0.0';
+        final sender = payload['friend_name'] as String? ??
+            payload['sender_name'] as String? ??
+            socketHub.connectedPeerIp ??
+            'Roommate';
+        peerVersions[sender] = version;
+        peerVersions['default'] = version;
+        if (isVersionOlder(version, currentProtocolVersion)) {
+          peerProtocolStatus[sender] = "OUTDATED_PROTOCOL";
+          peerProtocolStatus['default'] = "OUTDATED_PROTOCOL";
+          if (socketHub.connectedPeerIp != null) {
+            peerProtocolStatus[socketHub.connectedPeerIp!] = "OUTDATED_PROTOCOL";
+          }
+        } else {
+          peerProtocolStatus[sender] = "VALID";
+          peerProtocolStatus['default'] = "VALID";
+          if (socketHub.connectedPeerIp != null) {
+            peerProtocolStatus[socketHub.connectedPeerIp!] = "VALID";
           }
         }
         notifyListeners();
@@ -526,6 +556,43 @@ class AlarmController extends ChangeNotifier {
       return peerCheaterSystemAlarms.values.first;
     }
     return null;
+  }
+
+  static bool isVersionOlder(String peerVer, String targetVer) {
+    try {
+      final peerParts = peerVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      final targetParts = targetVer.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+      while (peerParts.length < targetParts.length) {
+        peerParts.add(0);
+      }
+      while (targetParts.length < peerParts.length) {
+        targetParts.add(0);
+      }
+      for (int i = 0; i < targetParts.length; i++) {
+        if (peerParts[i] < targetParts[i]) return true;
+        if (peerParts[i] > targetParts[i]) return false;
+      }
+      return false;
+    } catch (_) {
+      return true;
+    }
+  }
+
+  bool isPeerOutdated([String? peerKey]) {
+    if (peerKey != null && peerProtocolStatus.containsKey(peerKey)) {
+      return peerProtocolStatus[peerKey] == "OUTDATED_PROTOCOL";
+    }
+    if (peerKey != null) {
+      for (final entry in peerProtocolStatus.entries) {
+        if (entry.key.toLowerCase() == peerKey.toLowerCase()) {
+          return entry.value == "OUTDATED_PROTOCOL";
+        }
+      }
+    }
+    if (peerProtocolStatus.containsKey('default')) {
+      return peerProtocolStatus['default'] == "OUTDATED_PROTOCOL";
+    }
+    return false;
   }
 
   @override

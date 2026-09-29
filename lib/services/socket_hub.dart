@@ -20,6 +20,8 @@ class SocketHub extends ChangeNotifier {
   static const String eventAlarmSyncList = 'ALARM_SYNC_LIST';
   static const String eventPreemptiveSkip = 'PREEMPTIVE_SKIP';
   static const String eventSystemAlarmAlert = 'SYSTEM_ALARM_ALERT';
+  static const String eventVersionCheck = 'VERSION_CHECK';
+  static const String currentProtocolVersion = '1.1.0';
 
   HttpServer? _server;
   // Step 2 Requirement: Active tracker array list maintaining multi-client connections
@@ -58,6 +60,14 @@ class SocketHub extends ChangeNotifier {
               // Capture and track incoming multi-client connection
               _connectedClients.add(socket);
               notifyListeners();
+
+              // Immediately transmit protocol version check guard handshake
+              final versionPayload = {
+                'event': eventVersionCheck,
+                'version': currentProtocolVersion,
+                'timestamp': DateTime.now().toIso8601String(),
+              };
+              socket.add(jsonEncode(versionPayload));
 
               // Immediately sync active alarm state to newly tethered roommate
               final initialPayload = {
@@ -105,6 +115,14 @@ class SocketHub extends ChangeNotifier {
       isConnectedToPeer = true;
       connectedPeerIp = ipAddress;
       notifyListeners();
+
+      // Immediately transmit protocol version check guard handshake
+      final versionPayload = {
+        'event': eventVersionCheck,
+        'version': currentProtocolVersion,
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+      _peerSocket!.add(jsonEncode(versionPayload));
 
       _peerSocket!.listen(
         (dynamic data) => _handleIncomingData(data),
@@ -208,6 +226,16 @@ class SocketHub extends ChangeNotifier {
     _sendJsonPayload(payload);
   }
 
+  void sendVersionCheck([String? version, String? senderName]) {
+    final payload = {
+      'event': eventVersionCheck,
+      'version': version ?? currentProtocolVersion,
+      'sender_name': ?senderName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
   void _sendJsonPayload(Map<String, dynamic> payload) {
     final encoded = jsonEncode(payload);
 
@@ -239,7 +267,8 @@ class SocketHub extends ChangeNotifier {
               event == eventForceWake ||
               event == eventAlarmSyncList ||
               event == eventPreemptiveSkip ||
-              event == eventSystemAlarmAlert)) {
+              event == eventSystemAlarmAlert ||
+              event == eventVersionCheck)) {
         onEventReceived?.call(event, parsed);
       }
     } catch (e) {

@@ -375,18 +375,23 @@ class _PairingScreenState extends State<PairingScreen> {
         else
           ...devices.map((device) {
             final id = device.id ?? 0;
+            final isOutdated = widget.controller?.isPeerOutdated(device.friendName) ?? false;
             final cheaterAlarmTime = widget.controller?.getCheaterSystemAlarm(device.friendName);
-            final bool isCheater = cheaterAlarmTime != null;
+            final bool isCheater = !isOutdated && cheaterAlarmTime != null;
 
             return Container(
               margin: const EdgeInsets.only(bottom: 10),
               padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: isCheater ? const Color(0xFFFFF8F8) : AppTheme.cardWhite,
+                color: isOutdated
+                    ? const Color(0xFFFFFDE7)
+                    : (isCheater ? const Color(0xFFFFF8F8) : AppTheme.cardWhite),
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(
-                  color: isCheater ? const Color(0xFFD32F2F) : AppTheme.starkBlack,
-                  width: isCheater ? 2.5 : 1.5,
+                  color: isOutdated
+                      ? AppTheme.warningAmber
+                      : (isCheater ? const Color(0xFFD32F2F) : AppTheme.starkBlack),
+                  width: (isOutdated || isCheater) ? 2.5 : 1.5,
                 ),
                 boxShadow: const [
                   BoxShadow(
@@ -408,7 +413,18 @@ class _PairingScreenState extends State<PairingScreen> {
                           children: [
                             Row(
                               children: [
-                                if (isCheater)
+                                if (isOutdated)
+                                  Container(
+                                    width: 10,
+                                    height: 10,
+                                    margin: const EdgeInsets.only(right: 6),
+                                    decoration: BoxDecoration(
+                                      shape: BoxShape.circle,
+                                      color: AppTheme.warningAmber,
+                                      border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+                                    ),
+                                  )
+                                else if (isCheater)
                                   const Padding(
                                     padding: EdgeInsets.only(right: 6),
                                     child: FlashingWarningDot(),
@@ -437,27 +453,35 @@ class _PairingScreenState extends State<PairingScreen> {
                                 Container(
                                   padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                                   decoration: BoxDecoration(
-                                    color: device.isAuthorized
-                                        ? AppTheme.neonCyan.withValues(alpha: 0.25)
-                                        : AppTheme.alarmOrange.withValues(alpha: 0.2),
+                                    color: isOutdated
+                                        ? AppTheme.warningAmber.withValues(alpha: 0.25)
+                                        : (device.isAuthorized
+                                            ? AppTheme.neonCyan.withValues(alpha: 0.25)
+                                            : AppTheme.alarmOrange.withValues(alpha: 0.2)),
                                     borderRadius: BorderRadius.circular(4),
                                     border: Border.all(
-                                      color: device.isAuthorized
-                                          ? AppTheme.starkBlack
-                                          : AppTheme.alarmOrange,
+                                      color: isOutdated
+                                          ? AppTheme.warningAmber
+                                          : (device.isAuthorized
+                                              ? AppTheme.starkBlack
+                                              : AppTheme.alarmOrange),
                                       width: 1.0,
                                     ),
                                   ),
                                   child: Text(
-                                    device.isAuthorized ? 'AUTHORIZED' : 'REVOKED',
+                                    isOutdated
+                                        ? 'OUTDATED'
+                                        : (device.isAuthorized ? 'AUTHORIZED' : 'REVOKED'),
                                     style: TextStyle(
                                       fontFamily: 'serif',
                                       fontSize: 10,
                                       fontWeight: FontWeight.w900,
                                       letterSpacing: 0.5,
-                                      color: device.isAuthorized
-                                          ? AppTheme.starkBlack
-                                          : AppTheme.alarmOrange,
+                                      color: isOutdated
+                                          ? const Color(0xFFE65100)
+                                          : (device.isAuthorized
+                                              ? AppTheme.starkBlack
+                                              : AppTheme.alarmOrange),
                                     ),
                                   ),
                                 ),
@@ -474,7 +498,9 @@ class _PairingScreenState extends State<PairingScreen> {
                                 fontWeight: FontWeight.w600,
                               ),
                             ),
-                            if (isCheater)
+                            if (isOutdated)
+                              _buildOutdatedAppWarningPanel(device.friendName)
+                            else if (isCheater)
                               _buildCheatWarningPanel(device.friendName, cheaterAlarmTime),
                           ],
                         ),
@@ -591,6 +617,44 @@ class _PairingScreenState extends State<PairingScreen> {
               style: const TextStyle(
                 fontFamily: 'serif',
                 color: Color(0xFFB71C1C),
+                fontSize: 12,
+                fontWeight: FontWeight.w900,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildOutdatedAppWarningPanel(String friendName) {
+    return Container(
+      margin: const EdgeInsets.only(top: 8, bottom: 4),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: const Color(0xFFFFF8E1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+        boxShadow: const [
+          BoxShadow(
+            color: AppTheme.starkBlack,
+            offset: Offset(2, 2),
+            blurRadius: 0,
+          ),
+        ],
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('⚠️', style: TextStyle(fontSize: 16)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              '⚠️ OUTDATED APP: $friendName is running an older build without system alarm scanning metrics. Force them to update to restore connection checks!',
+              style: const TextStyle(
+                fontFamily: 'serif',
+                color: Color(0xFFE65100),
                 fontSize: 12,
                 fontWeight: FontWeight.w900,
                 height: 1.3,
