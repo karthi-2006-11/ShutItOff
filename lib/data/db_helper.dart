@@ -36,6 +36,7 @@ class DBHelper {
     }
   ];
   int _webIdCounter = 10;
+  final Map<String, String> _webSettings = {};
 
   Future<Database> get database async {
     if (_database != null) return _database!;
@@ -66,6 +67,7 @@ class DBHelper {
 
     await _createPairedDevicesTable(db);
     await _createHostelTables(db);
+    await _createSettingsTable(db);
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -75,6 +77,16 @@ class DBHelper {
     if (oldVersion < 3) {
       await _createHostelTables(db);
     }
+    await _createSettingsTable(db);
+  }
+
+  Future<void> _createSettingsTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS app_settings (
+        key TEXT PRIMARY KEY,
+        value TEXT NOT NULL
+      )
+    ''');
   }
 
   Future<void> _createPairedDevicesTable(Database db) async {
@@ -427,6 +439,45 @@ class DBHelper {
 
     final db = await database;
     return await db.delete('alarm_audit_logs');
+  }
+
+  // --- app_settings helper methods ---
+
+  Future<bool> isOnboardingComplete() async {
+    if (kIsWeb) {
+      return _webSettings['onboarding_complete'] == 'true';
+    }
+
+    final db = await database;
+    await _createSettingsTable(db);
+    final results = await db.query(
+      'app_settings',
+      where: 'key = ?',
+      whereArgs: ['onboarding_complete'],
+      limit: 1,
+    );
+    if (results.isNotEmpty) {
+      return results.first['value'] == 'true';
+    }
+    return false;
+  }
+
+  Future<void> setOnboardingComplete(bool complete) async {
+    if (kIsWeb) {
+      _webSettings['onboarding_complete'] = complete ? 'true' : 'false';
+      return;
+    }
+
+    final db = await database;
+    await _createSettingsTable(db);
+    await db.insert(
+      'app_settings',
+      {
+        'key': 'onboarding_complete',
+        'value': complete ? 'true' : 'false',
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
   }
 
   Future<void> close() async {

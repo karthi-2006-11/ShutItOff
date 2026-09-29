@@ -1,15 +1,18 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import '../controllers/alarm_controller.dart';
 import '../controllers/permission_controller.dart';
 import '../models/pairing_handshake.dart';
 import '../theme/app_theme.dart';
 
 class PairingScreen extends StatefulWidget {
   final bool isEmbedded;
+  final AlarmController? controller;
 
   const PairingScreen({
     super.key,
     this.isEmbedded = false,
+    this.controller,
   });
 
   @override
@@ -384,85 +387,148 @@ class _PairingScreenState extends State<PairingScreen> {
                   ),
                 ],
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              device.friendName,
-                              style: const TextStyle(
-                                fontFamily: 'serif',
-                                fontWeight: FontWeight.w800,
-                                fontSize: 15,
-                                color: AppTheme.starkBlack,
-                              ),
+                            Row(
+                              children: [
+                                Text(
+                                  device.friendName,
+                                  style: const TextStyle(
+                                    fontFamily: 'serif',
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 15,
+                                    color: AppTheme.starkBlack,
+                                  ),
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: device.isAuthorized
+                                        ? AppTheme.neonCyan.withValues(alpha: 0.25)
+                                        : AppTheme.alarmOrange.withValues(alpha: 0.2),
+                                    borderRadius: BorderRadius.circular(4),
+                                    border: Border.all(
+                                      color: device.isAuthorized
+                                          ? AppTheme.starkBlack
+                                          : AppTheme.alarmOrange,
+                                      width: 1.0,
+                                    ),
+                                  ),
+                                  child: Text(
+                                    device.isAuthorized ? 'AUTHORIZED' : 'REVOKED',
+                                    style: TextStyle(
+                                      fontFamily: 'serif',
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w900,
+                                      letterSpacing: 0.5,
+                                      color: device.isAuthorized
+                                          ? AppTheme.starkBlack
+                                          : AppTheme.alarmOrange,
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: device.isAuthorized
-                                    ? AppTheme.neonCyan.withValues(alpha: 0.25)
-                                    : AppTheme.alarmOrange.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(4),
-                                border: Border.all(
-                                  color: device.isAuthorized
-                                      ? AppTheme.starkBlack
-                                      : AppTheme.alarmOrange,
-                                  width: 1.0,
-                                ),
-                              ),
-                              child: Text(
-                                device.isAuthorized ? 'AUTHORIZED' : 'REVOKED',
-                                style: TextStyle(
-                                  fontFamily: 'serif',
-                                  fontSize: 10,
-                                  fontWeight: FontWeight.w900,
-                                  letterSpacing: 0.5,
-                                  color: device.isAuthorized
-                                      ? AppTheme.starkBlack
-                                      : AppTheme.alarmOrange,
-                                ),
+                            const SizedBox(height: 4),
+                            Text(
+                              'Code: ${device.connectionCode} • '
+                              '${device.canTurnOff ? "TurnOff ✓" : "TurnOff ✗"} • '
+                              '${device.canSnooze ? "Snooze ✓" : "Snooze ✗"}',
+                              style: const TextStyle(
+                                fontSize: 11,
+                                color: AppTheme.textMuted,
+                                fontWeight: FontWeight.w600,
                               ),
                             ),
                           ],
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          'Code: ${device.connectionCode} • '
-                          '${device.canTurnOff ? "TurnOff ✓" : "TurnOff ✗"} • '
-                          '${device.canSnooze ? "Snooze ✓" : "Snooze ✗"}',
-                          style: const TextStyle(
-                            fontSize: 11,
-                            color: AppTheme.textMuted,
-                            fontWeight: FontWeight.w600,
+                      ),
+                      if (device.isAuthorized)
+                        OutlinedButton(
+                          onPressed: () => _permissionController.revokeDevice(id),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: AppTheme.alarmOrange,
+                            side: const BorderSide(color: AppTheme.alarmOrange, width: 1.5),
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          ),
+                          child: const Text(
+                            'REVOKE',
+                            style: TextStyle(
+                              fontFamily: 'serif',
+                              fontWeight: FontWeight.w900,
+                              fontSize: 11,
+                            ),
                           ),
                         ),
-                      ],
-                    ),
+                    ],
                   ),
-                  if (device.isAuthorized)
-                    OutlinedButton(
-                      onPressed: () => _permissionController.revokeDevice(id),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppTheme.alarmOrange,
-                        side: const BorderSide(color: AppTheme.alarmOrange, width: 1.5),
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                  if (device.isAuthorized) ...[
+                    const SizedBox(height: 10),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppTheme.creamCanvas,
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: AppTheme.starkBlack, width: 1.5),
                       ),
-                      child: const Text(
-                        'REVOKE',
-                        style: TextStyle(
-                          fontFamily: 'serif',
-                          fontWeight: FontWeight.w900,
-                          fontSize: 11,
-                        ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Expanded(
+                            child: Text(
+                              '⏰ Next Alarm: ${widget.controller?.getNextPeerAlarmDisplay(device.friendName) ?? "06:00 AM"}',
+                              style: const TextStyle(
+                                fontFamily: 'serif',
+                                fontWeight: FontWeight.w900,
+                                fontSize: 12,
+                                color: AppTheme.starkBlack,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          InkWell(
+                            onTap: () {
+                              final alarmId = widget.controller?.getNextPeerAlarmId(device.friendName) ?? 1;
+                              widget.controller?.sendPreemptiveSkipCommand(alarmId, actorName: device.friendName);
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: Text('Dispatched [Skip Today] for ${device.friendName}\'s upcoming alarm.'),
+                                  backgroundColor: AppTheme.alarmOrange,
+                                ),
+                              );
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: AppTheme.cardWhite,
+                                borderRadius: BorderRadius.circular(6),
+                                border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+                              ),
+                              child: const Text(
+                                '[Skip Today]',
+                                style: TextStyle(
+                                  fontFamily: 'serif',
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 11,
+                                  color: AppTheme.alarmOrange,
+                                  letterSpacing: 0.5,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
+                  ],
                 ],
               ),
             );

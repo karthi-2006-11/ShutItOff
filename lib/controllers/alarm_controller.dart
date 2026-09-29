@@ -22,6 +22,11 @@ class AlarmController extends ChangeNotifier {
   List<Map<String, dynamic>> auditLogs = [];
   Map<String, dynamic>? activeRoom;
 
+  // Real-Time Schedule Sync & Preemptive Skip Contracts
+  static const String eventAlarmSyncList = "ALARM_SYNC_LIST";
+  static const String eventPreemptiveSkip = "PREEMPTIVE_SKIP";
+  Map<String, List<Map<String, dynamic>>> remotePeerAlarmSchedules = {};
+
   ReceivePort? _receivePort;
 
   final SocketHub socketHub = SocketHub();
@@ -38,6 +43,18 @@ class AlarmController extends ChangeNotifier {
     await loadAlarms();
     await loadAuditLogs();
     await loadActiveRoom();
+
+    socketHub.onClientConnected = (_) {
+      broadcastAlarmSync();
+    };
+
+    discoveryService.onPeerDiscovered = (peer) {
+      socketHub.connectToPeer(peer.ipAddress, port: peer.port).then((connected) {
+        if (connected) {
+          broadcastAlarmSync();
+        }
+      });
+    };
   }
 
   void _setupSocketListener() {
@@ -65,6 +82,21 @@ class AlarmController extends ChangeNotifier {
         // Sleeper captures FORCE_WAKE: immediately force 100% volume and frantic siren loop
         AlarmService.forceMaxVolumeFranticMode();
         notifyListeners();
+      } else if (event == SocketHub.eventAlarmSyncList || event == eventAlarmSyncList) {
+        final rawList = payload['alarms'] as List<dynamic>? ?? [];
+        final sender = payload['sender_name'] as String? ??
+            socketHub.connectedPeerIp ??
+            'Roommate';
+        final parsedAlarms = rawList.map((e) => Map<String, dynamic>.from(e as Map)).toList();
+        remotePeerAlarmSchedules[sender] = parsedAlarms;
+        remotePeerAlarmSchedules['default'] = parsedAlarms;
+        notifyListeners();
+      } else if (event == SocketHub.eventPreemptiveSkip || event == eventPreemptiveSkip) {
+        final id = payload['alarm_id'] as int?;
+        final actor = payload['actor_name'] as String? ?? 'Roommate';
+        if (id != null) {
+          handlePreemptiveSkip(id, actorName: actor);
+        }
       }
     };
   }
@@ -161,6 +193,7 @@ class AlarmController extends ChangeNotifier {
     final nextTime = computeNextAlarmTime(alarmTime);
     await AlarmService.scheduleAlarm(id: id, targetTime: nextTime);
     await loadAlarms();
+    broadcastAlarmSync();
   }
 
   Future<void> toggleAlarm(int id, bool isEnabled) async {
@@ -175,6 +208,7 @@ class AlarmController extends ChangeNotifier {
       await AlarmService.cancelAlarm(id);
     }
     await loadAlarms();
+    broadcastAlarmSync();
   }
 
   Future<void> deleteAlarm(int id) async {
@@ -184,6 +218,7 @@ class AlarmController extends ChangeNotifier {
     await AlarmService.cancelAlarm(id);
     await DBHelper.instance.deleteAlarm(id);
     await loadAlarms();
+    broadcastAlarmSync();
   }
 
   void turnOffLocalAlarm(int id, {String? actorName, bool logAction = true}) {
@@ -291,6 +326,96 @@ class AlarmController extends ChangeNotifier {
   /// Roommate taps [WAKE HIM] to force max volume frantic mode on host phone
   void sendForceWakeCommand([int? alarmId]) {
     socketHub.sendForceWake(alarmId ?? activeRingingAlarmId);
+  }
+
+  void broadcastAlarmSync() {
+    socketHub.broadcastAlarmSyncList(
+      alarms,
+      senderName: activeRoom?['room_name'] ?? 'Host',
+    );
+  }
+
+  Future<void> handlePreemptiveSkip(int id, {String? actorName}) async {
+    final actor = actorName ?? 'Roommate';
+
+    try {
+      await DBHelper.instance.insertAuditLog(id, actor, 'PREEMPTIVE_SKIP');
+      await loadAuditLogs();
+    } catch (_) {}
+
+    await AlarmService.cancelAlarm(id);
+
+    final alarm = await DBHelper.instance.getAlarm(id);
+    if (alarm != null && alarm['is_enabled'] == 1) {
+      final alarmTimeStr = alarm['alarm_time'] as String;
+      final tomorrowTime = computeNextAlarmTime(alarmTimeStr, forceNextDay: true);
+      await AlarmService.scheduleAlarm(id: id, targetTime: tomorrowTime);
+    }
+
+    if (activeRingingAlarmId == id) {
+      turnOffLocalAlarm(id, actorName: actor, logAction: false);
+    }
+
+    broadcastAlarmSync();
+    notifyListeners();
+  }
+
+  void sendPreemptiveSkipCommand(int alarmId, {String? actorName}) {
+    final actor = actorName ?? 'Roommate';
+    socketHub.sendPreemptiveSkip(alarmId, actor);
+  }
+
+  String getNextPeerAlarmDisplay([String? peerKey]) {
+    List<Map<String, dynamic>>? peerAlarms;
+    if (peerKey != null && remotePeerAlarmSchedules.containsKey(peerKey)) {
+      peerAlarms = remotePeerAlarmSchedules[peerKey];
+    } else if (remotePeerAlarmSchedules.containsKey('default')) {
+      peerAlarms = remotePeerAlarmSchedules['default'];
+    } else if (remotePeerAlarmSchedules.isNotEmpty) {
+      peerAlarms = remotePeerAlarmSchedules.values.first;
+    }
+
+    if (peerAlarms != null && peerAlarms.isNotEmpty) {
+      final enabledAlarms = peerAlarms.where((a) => a['is_enabled'] == 1).toList();
+      if (enabledAlarms.isNotEmpty) {
+        final timeStr = enabledAlarms.first['alarm_time'] as String? ?? '06:00';
+        return _formatAlarmTime(timeStr);
+      }
+    }
+    return '06:00 AM';
+  }
+
+  int getNextPeerAlarmId([String? peerKey]) {
+    List<Map<String, dynamic>>? peerAlarms;
+    if (peerKey != null && remotePeerAlarmSchedules.containsKey(peerKey)) {
+      peerAlarms = remotePeerAlarmSchedules[peerKey];
+    } else if (remotePeerAlarmSchedules.containsKey('default')) {
+      peerAlarms = remotePeerAlarmSchedules['default'];
+    } else if (remotePeerAlarmSchedules.isNotEmpty) {
+      peerAlarms = remotePeerAlarmSchedules.values.first;
+    }
+
+    if (peerAlarms != null && peerAlarms.isNotEmpty) {
+      final enabledAlarms = peerAlarms.where((a) => a['is_enabled'] == 1).toList();
+      if (enabledAlarms.isNotEmpty) {
+        return enabledAlarms.first['id'] as int? ?? 1;
+      }
+      return peerAlarms.first['id'] as int? ?? 1;
+    }
+    return 1;
+  }
+
+  String _formatAlarmTime(String rawTime) {
+    try {
+      final parts = rawTime.split(':');
+      final hour = int.parse(parts[0]);
+      final minute = int.parse(parts[1]);
+      final period = hour >= 12 ? 'PM' : 'AM';
+      final formattedHour = hour > 12 ? hour - 12 : (hour == 0 ? 12 : hour);
+      return '${formattedHour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')} $period';
+    } catch (_) {
+      return '$rawTime AM';
+    }
   }
 
   @override

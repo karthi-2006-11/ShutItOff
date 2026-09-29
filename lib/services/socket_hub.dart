@@ -17,6 +17,8 @@ class SocketHub extends ChangeNotifier {
   static const String eventRemoteSnooze = 'REMOTE_SNOOZE';
   static const String eventAlarmEscalated = 'ALARM_ESCALATED';
   static const String eventForceWake = 'FORCE_WAKE';
+  static const String eventAlarmSyncList = 'ALARM_SYNC_LIST';
+  static const String eventPreemptiveSkip = 'PREEMPTIVE_SKIP';
 
   HttpServer? _server;
   // Step 2 Requirement: Active tracker array list maintaining multi-client connections
@@ -31,6 +33,7 @@ class SocketHub extends ChangeNotifier {
   List<WebSocket> get connectedClients => List.unmodifiable(_connectedClients);
 
   void Function(String event, Map<String, dynamic> payload)? onEventReceived;
+  void Function(WebSocket socket)? onClientConnected;
 
   NetworkConnectionState get connectionState {
     if (isConnectedToPeer) return NetworkConnectionState.connectedToPeer;
@@ -61,6 +64,9 @@ class SocketHub extends ChangeNotifier {
                 'timestamp': DateTime.now().toIso8601String(),
               };
               socket.add(jsonEncode(initialPayload));
+
+              // Trigger onClientConnected callback to broadcast active alarm list
+              onClientConnected?.call(socket);
 
               socket.listen(
                 (dynamic data) => _handleIncomingData(data),
@@ -171,6 +177,26 @@ class SocketHub extends ChangeNotifier {
     _sendJsonPayload(payload);
   }
 
+  void broadcastAlarmSyncList(List<Map<String, dynamic>> alarmsList, {String? senderName}) {
+    final payload = {
+      'event': eventAlarmSyncList,
+      'alarms': alarmsList,
+      'sender_name': ?senderName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
+  void sendPreemptiveSkip(int alarmId, [String? actorName]) {
+    final payload = {
+      'event': eventPreemptiveSkip,
+      'alarm_id': alarmId,
+      'actor_name': ?actorName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
   void _sendJsonPayload(Map<String, dynamic> payload) {
     final encoded = jsonEncode(payload);
 
@@ -199,7 +225,9 @@ class SocketHub extends ChangeNotifier {
               event == eventRemoteDismiss ||
               event == eventRemoteSnooze ||
               event == eventAlarmEscalated ||
-              event == eventForceWake)) {
+              event == eventForceWake ||
+              event == eventAlarmSyncList ||
+              event == eventPreemptiveSkip)) {
         onEventReceived?.call(event, parsed);
       }
     } catch (e) {

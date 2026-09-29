@@ -434,45 +434,133 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
               ),
             )
           else
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
+            Column(
               children: _pairedDevices.map((device) {
                 final friendName = device['friend_name'] as String? ?? 'Peer';
                 final isAuthorized = device['is_authorized'] == 1;
 
                 return Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  margin: const EdgeInsets.only(bottom: 10),
+                  padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: isAuthorized
-                        ? AppTheme.neonCyan.withValues(alpha: 0.2)
-                        : AppTheme.creamCanvas,
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(
-                      color: AppTheme.starkBlack,
-                      width: 1.5,
-                    ),
+                    color: AppTheme.cardWhite,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+                    boxShadow: const [
+                      BoxShadow(
+                        color: AppTheme.starkBlack,
+                        offset: Offset(2, 2),
+                        blurRadius: 0,
+                      ),
+                    ],
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: [
-                      Icon(
-                        Icons.person,
-                        size: 16,
-                        color: isAuthorized
-                            ? AppTheme.starkBlack
-                            : AppTheme.textMuted,
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.person,
+                                size: 16,
+                                color: isAuthorized ? AppTheme.starkBlack : AppTheme.textMuted,
+                              ),
+                              const SizedBox(width: 6),
+                              Text(
+                                '$friendName - ${isAuthorized ? "AUTHORIZED" : "REVOKED"}',
+                                style: const TextStyle(
+                                  fontFamily: 'serif',
+                                  color: AppTheme.starkBlack,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                            ],
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: isAuthorized
+                                  ? AppTheme.neonCyan.withValues(alpha: 0.25)
+                                  : AppTheme.alarmOrange.withValues(alpha: 0.2),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(
+                                color: isAuthorized ? AppTheme.starkBlack : AppTheme.alarmOrange,
+                                width: 1.0,
+                              ),
+                            ),
+                            child: Text(
+                              isAuthorized ? 'LINKED' : 'UNPAIRED',
+                              style: TextStyle(
+                                fontFamily: 'serif',
+                                fontSize: 9,
+                                fontWeight: FontWeight.w900,
+                                color: isAuthorized ? AppTheme.starkBlack : AppTheme.alarmOrange,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      const SizedBox(width: 6),
-                      Text(
-                        friendName,
-                        style: const TextStyle(
-                          fontFamily: 'serif',
-                          color: AppTheme.starkBlack,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w800,
+                      if (isAuthorized) ...[
+                        const SizedBox(height: 10),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: AppTheme.creamCanvas,
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+                          ),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  '⏰ Next Alarm: ${widget.controller.getNextPeerAlarmDisplay(friendName)}',
+                                  style: const TextStyle(
+                                    fontFamily: 'serif',
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 12,
+                                    color: AppTheme.starkBlack,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              InkWell(
+                                onTap: () {
+                                  final alarmId = widget.controller.getNextPeerAlarmId(friendName);
+                                  widget.controller.sendPreemptiveSkipCommand(alarmId, actorName: friendName);
+                                  ScaffoldMessenger.of(context).showSnackBar(
+                                    SnackBar(
+                                      content: Text('Dispatched [Skip Today] for $friendName\'s upcoming alarm.'),
+                                      backgroundColor: AppTheme.alarmOrange,
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                  decoration: BoxDecoration(
+                                    color: AppTheme.cardWhite,
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+                                  ),
+                                  child: const Text(
+                                    '[Skip Today]',
+                                    style: TextStyle(
+                                      fontFamily: 'serif',
+                                      fontWeight: FontWeight.w900,
+                                      fontSize: 11,
+                                      color: AppTheme.alarmOrange,
+                                      letterSpacing: 0.5,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
-                      ),
+                      ],
                     ],
                   ),
                 );

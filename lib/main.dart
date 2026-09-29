@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
+import 'data/db_helper.dart';
 import 'screens/escalation_overlay.dart';
 import 'screens/eye_clock_widget.dart';
 import 'screens/hostel_hub_screen.dart';
 import 'screens/network_hud_widget.dart';
+import 'screens/onboarding_splash_screen.dart';
 import 'screens/pairing_screen.dart';
 import 'services/alarm_service.dart';
 import 'theme/app_theme.dart';
@@ -11,11 +13,36 @@ import 'theme/app_theme.dart';
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await AlarmService.initialize();
-  runApp(const ShutItOffApp());
+  final bool onboardingComplete = await DBHelper.instance.isOnboardingComplete();
+  runApp(ShutItOffApp(initialOnboardingComplete: onboardingComplete));
 }
 
-class ShutItOffApp extends StatelessWidget {
-  const ShutItOffApp({super.key});
+class ShutItOffApp extends StatefulWidget {
+  final bool initialOnboardingComplete;
+
+  const ShutItOffApp({
+    super.key,
+    this.initialOnboardingComplete = false,
+  });
+
+  @override
+  State<ShutItOffApp> createState() => _ShutItOffAppState();
+}
+
+class _ShutItOffAppState extends State<ShutItOffApp> {
+  late bool _onboardingDone;
+
+  @override
+  void initState() {
+    super.initState();
+    _onboardingDone = widget.initialOnboardingComplete;
+  }
+
+  void _markOnboardingComplete() {
+    setState(() {
+      _onboardingDone = true;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -24,7 +51,11 @@ class ShutItOffApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
       themeMode: ThemeMode.light,
-      home: const AlarmHomeScreen(),
+      home: _onboardingDone
+          ? const AlarmHomeScreen()
+          : OnboardingSplashScreen(
+              onComplete: _markOnboardingComplete,
+            ),
     );
   }
 }
@@ -130,7 +161,10 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                   // ========================================================
                   // VIEW PANEL B: THE P2P HANDSHAKE EXCHANGE INPUT
                   // ========================================================
-                  const PairingScreen(isEmbedded: true),
+                  PairingScreen(
+                    isEmbedded: true,
+                    controller: _alarmController,
+                  ),
 
                   // ========================================================
                   // VIEW PANEL C: THE MULTI-PEER HOSTEL HUB TIMELINE MONITOR
