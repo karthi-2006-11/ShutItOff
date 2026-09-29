@@ -123,7 +123,7 @@ class AlarmController extends ChangeNotifier {
             payload['sender_name'] as String? ??
             socketHub.connectedPeerIp ??
             'Roommate';
-        if (alarmTime.isNotEmpty) {
+        if (alarmTime.isNotEmpty && isWithinMorningWindow(alarmTime)) {
           peerCheaterSystemAlarms[sender] = alarmTime;
           peerCheaterSystemAlarms['default'] = alarmTime;
           if (socketHub.connectedPeerIp != null) {
@@ -458,11 +458,32 @@ class AlarmController extends ChangeNotifier {
     }
   }
 
+  static bool isWithinMorningWindow(String? timeStr) {
+    if (timeStr == null || timeStr.trim().isEmpty) return false;
+    try {
+      final parts = timeStr.trim().split(' ');
+      if (parts.length < 2) return false;
+      final timeParts = parts[0].split(':');
+      var hour = int.parse(timeParts[0]);
+      final period = parts[1].toUpperCase();
+      if (period == 'PM' && hour != 12) {
+        hour += 12;
+      } else if (period == 'AM' && hour == 12) {
+        hour = 0;
+      }
+      return hour >= 4 && hour <= 7;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> checkLocalSystemAlarmAndBroadcast() async {
     try {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         final String? result = await _permissionsChannel.invokeMethod<String>('getNextSystemAlarmClock');
-        final formatted = (result != null && result.isNotEmpty) ? result : null;
+        final formatted = (result != null && result.isNotEmpty && isWithinMorningWindow(result))
+            ? result
+            : null;
         if (formatted != localSystemAlarmTime) {
           localSystemAlarmTime = formatted;
           notifyListeners();
@@ -480,6 +501,10 @@ class AlarmController extends ChangeNotifier {
 
   void broadcastSystemAlarmAlert(String alarmTime) {
     final senderName = activeRoom?['room_name'] ?? 'Host';
+    if (alarmTime.isNotEmpty && !isWithinMorningWindow(alarmTime)) {
+      socketHub.broadcastSystemAlarmAlert('', friendName: senderName);
+      return;
+    }
     socketHub.broadcastSystemAlarmAlert(alarmTime, friendName: senderName);
   }
 

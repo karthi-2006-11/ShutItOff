@@ -13,6 +13,7 @@ import io.flutter.plugin.common.MethodChannel
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Locale
+import java.util.TimeZone
 
 class MainActivity : FlutterActivity() {
     private val PERMISSIONS_CHANNEL = "com.example.shutitoff/permissions"
@@ -92,10 +93,25 @@ class MainActivity : FlutterActivity() {
                         }
                         if (nextAlarm != null) {
                             val triggerTime = nextAlarm.triggerTime
-                            val calendar = Calendar.getInstance().apply { timeInMillis = triggerTime }
-                            val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault())
-                            val formatted = sdf.format(calendar.time)
-                            result.success(formatted)
+                            val deviceTimeZone = TimeZone.getDefault()
+                            val calendar = Calendar.getInstance(deviceTimeZone).apply {
+                                timeZone = deviceTimeZone
+                                timeInMillis = triggerTime
+                            }
+                            // Extract exact upcoming alarm hour integer in 24-hour format
+                            val hourOfDay = calendar.get(Calendar.HOUR_OF_DAY)
+
+                            // Morning Timeframe Gatekeeper: 4:00 AM (04:00) to 7:00 AM (07:00) inclusive
+                            if (hourOfDay in 4..7) {
+                                val sdf = SimpleDateFormat("hh:mm a", Locale.getDefault()).apply {
+                                    timeZone = deviceTimeZone
+                                }
+                                val formatted = sdf.format(calendar.time)
+                                result.success(formatted)
+                            } else {
+                                // Outside 4am-7am window (e.g. 11:00 PM / 23:00) -> treat as empty string / no conflict
+                                result.success("")
+                            }
                         } else {
                             result.success("")
                         }

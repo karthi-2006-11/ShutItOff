@@ -26,6 +26,25 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
     }
   }
 
+  static bool isWithinMorningWindow(String? timeStr) {
+    if (timeStr == null || timeStr.trim().isEmpty) return false;
+    try {
+      final parts = timeStr.trim().split(' ');
+      if (parts.length < 2) return false;
+      final timeParts = parts[0].split(':');
+      var hour = int.parse(timeParts[0]);
+      final period = parts[1].toUpperCase();
+      if (period == 'PM' && hour != 12) {
+        hour += 12;
+      } else if (period == 'AM' && hour == 12) {
+        hour = 0;
+      }
+      return hour >= 4 && hour <= 7;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> evaluateCurrentDevicePermissions() async {
     isEvaluating = true;
     notifyListeners();
@@ -37,7 +56,11 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
         final String? systemAlarm = await _channel.invokeMethod<String>('getNextSystemAlarmClock');
         isBatteryUnrestricted = battery ?? false;
         isOverlayAllowed = overlay ?? false;
-        detectedSystemAlarmTime = (systemAlarm != null && systemAlarm.isNotEmpty) ? systemAlarm : null;
+        if (systemAlarm != null && systemAlarm.isNotEmpty && isWithinMorningWindow(systemAlarm)) {
+          detectedSystemAlarmTime = systemAlarm;
+        } else {
+          detectedSystemAlarmTime = null;
+        }
       } else {
         // Fallback for non-Android environments (web/preview/tests)
         isBatteryUnrestricted = true;
