@@ -14,6 +14,8 @@ class SocketHub extends ChangeNotifier {
   static const int defaultPort = 8080;
   static const String eventAlarmRinging = 'ALARM_RINGING';
   static const String eventRemoteDismiss = 'REMOTE_DISMISS';
+  static const String eventAlarmEscalated = 'ALARM_ESCALATED';
+  static const String eventForceWake = 'FORCE_WAKE';
 
   HttpServer? _server;
   final Set<WebSocket> _serverSockets = {};
@@ -124,6 +126,25 @@ class SocketHub extends ChangeNotifier {
     _sendJsonPayload(payload);
   }
 
+  void broadcastAlarmEscalated({int? alarmId, String? friendName}) {
+    final payload = {
+      'event': eventAlarmEscalated,
+      'alarm_id': alarmId,
+      'friend_name': ?friendName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
+  void sendForceWake([int? alarmId]) {
+    final payload = {
+      'event': eventForceWake,
+      'alarm_id': alarmId,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
   void _sendJsonPayload(Map<String, dynamic> payload) {
     final encoded = jsonEncode(payload);
 
@@ -145,8 +166,12 @@ class SocketHub extends ChangeNotifier {
       final parsed = jsonDecode(rawData.toString()) as Map<String, dynamic>;
       final event = parsed['event'] as String?;
 
-      // STRICT PROTOCOL REQUIREMENT: Listen and act ONLY upon ALARM_RINGING and REMOTE_DISMISS
-      if (event != null && (event == eventAlarmRinging || event == eventRemoteDismiss)) {
+      // STRICT PROTOCOL REQUIREMENT: Listen and act ONLY upon ALARM_RINGING, REMOTE_DISMISS, ALARM_ESCALATED, FORCE_WAKE
+      if (event != null &&
+          (event == eventAlarmRinging ||
+              event == eventRemoteDismiss ||
+              event == eventAlarmEscalated ||
+              event == eventForceWake)) {
         onEventReceived?.call(event, parsed);
       }
     } catch (e) {

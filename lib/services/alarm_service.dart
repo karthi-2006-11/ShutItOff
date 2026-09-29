@@ -78,9 +78,30 @@ class AlarmService {
     }
   }
 
+  static Future<void> forceMaxVolumeFranticMode() async {
+    try {
+      _audioPlayer ??= AudioPlayer();
+      await _audioPlayer!.setReleaseMode(ReleaseMode.loop);
+      // Force audioplayers stream to 1.0 (100% max volume)
+      await _audioPlayer!.setVolume(1.0);
+      // Toggle tone into frantic max-frequency state (accelerated frantic siren pattern)
+      await _audioPlayer!.setPlaybackRate(1.5);
+      if (_audioPlayer!.state != PlayerState.playing) {
+        await _audioPlayer!.play(AssetSource('audio/alarm.mp3'));
+      }
+    } catch (_) {
+      try {
+        await _audioPlayer?.play(AssetSource('audio/alarm.wav'));
+      } catch (_) {}
+    }
+  }
+
   static Future<void> stopRingtone() async {
     try {
       if (_audioPlayer != null) {
+        try {
+          await _audioPlayer!.setPlaybackRate(1.0);
+        } catch (_) {}
         await _audioPlayer!.stop();
         await _audioPlayer!.dispose();
         _audioPlayer = null;

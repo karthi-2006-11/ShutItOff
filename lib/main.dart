@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
+import 'screens/escalation_overlay.dart';
 import 'screens/network_hud_widget.dart';
 import 'screens/pairing_screen.dart';
 import 'services/alarm_service.dart';
@@ -127,6 +128,18 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                       _alarmController.discoveryService.startBrowsing();
                     },
                   ),
+                  if (_alarmController.isEscalated)
+                    EscalationOverlay(
+                      friendName: _alarmController.escalatedFriendName ?? 'Your Roommate',
+                      onWakeHim: () {
+                        _alarmController.sendForceWakeCommand();
+                      },
+                      onDismiss: () {
+                        _alarmController.triggerRemoteDismiss(
+                          _alarmController.activeRingingAlarmId ?? 0,
+                        );
+                      },
+                    ),
                   Expanded(child: _buildAlarmList()),
                 ],
               ),
@@ -322,11 +335,16 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  const Text(
-                    'Alarm is ringing continuously',
+                  Text(
+                    _alarmController.ringingDurationSeconds >= 60
+                        ? '⚠️ ESCALATED TO ROOMMATES (${_alarmController.ringingDurationSeconds}s)'
+                        : 'Alarm ringing: ${_alarmController.ringingDurationSeconds}s (Escalates at 60s)',
                     style: TextStyle(
-                      color: Color(0xFFB0B3C0),
-                      fontSize: 16,
+                      color: _alarmController.ringingDurationSeconds >= 60
+                          ? const Color(0xFFFF6D00)
+                          : const Color(0xFFB0B3C0),
+                      fontSize: 15,
+                      fontWeight: FontWeight.w700,
                     ),
                   ),
                 ],
