@@ -96,9 +96,12 @@ void main() {
       expect(AlarmController.isWithinMorningWindow('23,0,11:00 PM'), isFalse);
       expect(AlarmController.isWithinMorningWindow('3,59,03:59 AM'), isFalse);
 
-      final parsed = AlarmController.parseSystemAlarmString('6,30,06:30 AM');
+      final parsed = AlarmController.parseSystemAlarmString('6,20,06:20 AM');
+      expect(parsed.isMorningConflict, isTrue);
       expect(parsed.isCheating, isTrue);
-      expect(parsed.formattedTime, equals('06:30 AM'));
+      expect(parsed.formattedTime, equals('06:20 AM'));
+      expect(AlarmController.isWithinMorningWindow('6,20,06:20 AM'), isTrue);
+      expect(AlarmController.isWithinMorningWindow('06:20 AM'), isTrue);
     });
   });
 }

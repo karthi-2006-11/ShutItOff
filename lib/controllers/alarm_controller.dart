@@ -129,7 +129,7 @@ class AlarmController extends ChangeNotifier {
             socketHub.connectedPeerIp ??
             'Roommate';
         final parsed = parseSystemAlarmString(rawAlarm);
-        if (parsed.isCheating && parsed.formattedTime.isNotEmpty) {
+        if (parsed.isMorningConflict && parsed.formattedTime.isNotEmpty) {
           peerCheaterSystemAlarms[sender] = parsed.formattedTime;
           peerCheaterSystemAlarms['default'] = parsed.formattedTime;
           if (socketHub.connectedPeerIp != null) {
@@ -143,7 +143,7 @@ class AlarmController extends ChangeNotifier {
           }
           peerCheaterSystemAlarms.removeWhere((key, value) =>
               key.toLowerCase() == sender.toLowerCase() ||
-              !parseSystemAlarmString(value).isCheating);
+              !parseSystemAlarmString(value).isMorningConflict);
         }
         notifyListeners();
       } else if (event == SocketHub.eventVersionCheck || event == eventVersionCheck) {
@@ -489,7 +489,7 @@ class AlarmController extends ChangeNotifier {
     }
   }
 
-  static ({bool isCheating, String formattedTime}) parseSystemAlarmString(String? raw) {
+  static ({bool isMorningConflict, bool isCheating, String formattedTime}) parseSystemAlarmString(String? raw) {
     return PermissionStateController.parseSystemAlarmString(raw);
   }
 
@@ -502,7 +502,7 @@ class AlarmController extends ChangeNotifier {
       if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
         final String? rawResult = await _permissionsChannel.invokeMethod<String>('getNextSystemAlarmClock');
         final parsed = parseSystemAlarmString(rawResult);
-        final formatted = (parsed.isCheating && parsed.formattedTime.isNotEmpty)
+        final formatted = (parsed.isMorningConflict && parsed.formattedTime.isNotEmpty)
             ? parsed.formattedTime
             : null;
         if (formatted != localSystemAlarmTime) {

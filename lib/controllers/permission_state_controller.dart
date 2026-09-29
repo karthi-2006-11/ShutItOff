@@ -28,9 +28,9 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
     }
   }
 
-  static ({bool isCheating, String formattedTime}) parseSystemAlarmString(String? raw) {
+  static ({bool isMorningConflict, bool isCheating, String formattedTime}) parseSystemAlarmString(String? raw) {
     if (raw == null || raw.trim().isEmpty) {
-      return (isCheating: false, formattedTime: '');
+      return (isMorningConflict: false, isCheating: false, formattedTime: '');
     }
     try {
       final trimmed = raw.trim();
@@ -39,17 +39,17 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
       String formattedTime;
 
       if (trimmed.contains(',')) {
-        // Kotlin returned "hour24,minute,formattedTime" (e.g., "6,30,06:30 AM")
+        // Kotlin returned "hour24,minute,formattedTime" (e.g., "6,20,06:20 AM")
         final parts = trimmed.split(',');
         hour24 = int.parse(parts[0].trim());
         minute = int.parse(parts[1].trim());
         formattedTime = parts.sublist(2).join(',').trim();
       } else {
-        // Fallback for standard formatted string e.g. "06:30 AM"
+        // Fallback for standard formatted string e.g. "06:20 AM"
         final parts = trimmed.split(' ');
-        if (parts.length < 2) return (isCheating: false, formattedTime: '');
+        if (parts.length < 2) return (isMorningConflict: false, isCheating: false, formattedTime: '');
         final timeParts = parts[0].split(':');
-        if (timeParts.length < 2) return (isCheating: false, formattedTime: '');
+        if (timeParts.length < 2) return (isMorningConflict: false, isCheating: false, formattedTime: '');
         var h = int.parse(timeParts[0]);
         minute = int.parse(timeParts[1]);
         final period = parts[1].toUpperCase();
@@ -62,16 +62,16 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
         formattedTime = trimmed;
       }
 
-      // Math Logic: bool isCheating = (hour24 >= 4 && hour24 <= 6) || (hour24 == 7 && minute == 0);
-      final bool isCheating = (hour24 >= 4 && hour24 <= 6) || (hour24 == 7 && minute == 0);
-      return (isCheating: isCheating, formattedTime: formattedTime);
+      // Logic check: final isMorningConflict = (hour24 >= 4 && hour24 <= 6) || (hour24 == 7 && minute == 0);
+      final bool isMorningConflict = (hour24 >= 4 && hour24 <= 6) || (hour24 == 7 && minute == 0);
+      return (isMorningConflict: isMorningConflict, isCheating: isMorningConflict, formattedTime: formattedTime);
     } catch (_) {
-      return (isCheating: false, formattedTime: '');
+      return (isMorningConflict: false, isCheating: false, formattedTime: '');
     }
   }
 
   static bool isWithinMorningWindow(String? timeStr) {
-    return parseSystemAlarmString(timeStr).isCheating;
+    return parseSystemAlarmString(timeStr).isMorningConflict;
   }
 
   Future<void> evaluateCurrentDevicePermissions() async {
@@ -87,10 +87,10 @@ class PermissionStateController extends ChangeNotifier with WidgetsBindingObserv
         isOverlayAllowed = overlay ?? false;
 
         final parsed = parseSystemAlarmString(rawAlarm);
-        if (parsed.isCheating) {
-          detectedSystemAlarmTime = parsed.formattedTime;
+        if (parsed.isMorningConflict) {
+          localSystemAlarmTime = parsed.formattedTime;
         } else {
-          detectedSystemAlarmTime = null;
+          localSystemAlarmTime = null;
         }
       } else {
         // Fallback for non-Android environments (web/preview/tests)
