@@ -1,13 +1,16 @@
 import 'package:flutter/material.dart';
 import '../controllers/alarm_controller.dart';
 import '../data/db_helper.dart';
+import '../theme/app_theme.dart';
 
 class HostelHubScreen extends StatefulWidget {
   final AlarmController controller;
+  final bool isEmbedded;
 
   const HostelHubScreen({
     super.key,
     required this.controller,
+    this.isEmbedded = false,
   });
 
   @override
@@ -44,18 +47,18 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF16181F),
+          backgroundColor: AppTheme.cardWhite,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppTheme.starkBlack, width: 2.5),
+          ),
           title: const Row(
             children: [
-              Icon(Icons.meeting_room_outlined, color: Color(0xFF0A84FF)),
+              Icon(Icons.meeting_room_outlined, color: AppTheme.starkBlack),
               SizedBox(width: 10),
               Text(
-                'Create Hostel Room',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.w700,
-                  fontSize: 18,
-                ),
+                'Configure Hostel Room',
+                style: AppTheme.slabTitle,
               ),
             ],
           ),
@@ -64,18 +67,10 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
             children: [
               TextField(
                 controller: roomNameController,
-                style: const TextStyle(color: Colors.white),
+                style: const TextStyle(fontWeight: FontWeight.w700, color: AppTheme.starkBlack),
                 decoration: const InputDecoration(
                   labelText: 'Room Identifier',
-                  labelStyle: TextStyle(color: Color(0xFF8E93A4)),
                   hintText: 'e.g. B204 or Block-A-302',
-                  hintStyle: TextStyle(color: Color(0xFF4A4E5D)),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF282B37)),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF0A84FF)),
-                  ),
                 ),
               ),
               const SizedBox(height: 16),
@@ -83,19 +78,16 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                 controller: hostCodeController,
                 keyboardType: TextInputType.number,
                 maxLength: 6,
-                style: const TextStyle(color: Colors.white, letterSpacing: 3.0),
+                style: const TextStyle(
+                  color: AppTheme.starkBlack,
+                  fontWeight: FontWeight.w900,
+                  letterSpacing: 4.0,
+                  fontFamily: 'monospace',
+                ),
                 decoration: const InputDecoration(
                   labelText: '6-Digit Room Host Code',
-                  labelStyle: TextStyle(color: Color(0xFF8E93A4)),
+                  counterText: '',
                   hintText: '6-digit PIN',
-                  counterStyle: TextStyle(color: Color(0xFF8E93A4)),
-                  hintStyle: TextStyle(color: Color(0xFF4A4E5D)),
-                  enabledBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF282B37)),
-                  ),
-                  focusedBorder: UnderlineInputBorder(
-                    borderSide: BorderSide(color: Color(0xFF0A84FF)),
-                  ),
                 ),
               ),
             ],
@@ -103,11 +95,11 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF8E93A4))),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted, fontWeight: FontWeight.w700)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFF0A84FF),
+                backgroundColor: AppTheme.starkBlack,
                 foregroundColor: Colors.white,
               ),
               onPressed: () async {
@@ -122,7 +114,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text('Hostel Hub room "$roomName" active.'),
-                        backgroundColor: const Color(0xFF30D158),
+                        backgroundColor: AppTheme.successGreen,
                       ),
                     );
                   }
@@ -141,23 +133,27 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
       context: context,
       builder: (BuildContext dialogContext) {
         return AlertDialog(
-          backgroundColor: const Color(0xFF16181F),
+          backgroundColor: AppTheme.cardWhite,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: const BorderSide(color: AppTheme.starkBlack, width: 2.5),
+          ),
           title: const Text(
             'Clear Audit Ledger?',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: AppTheme.slabTitle,
           ),
           content: const Text(
             'This will permanently delete all logged deactivation receipts from the local ledger.',
-            style: TextStyle(color: Color(0xFF8E93A4)),
+            style: TextStyle(color: AppTheme.textMuted, fontWeight: FontWeight.w500),
           ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(dialogContext).pop(false),
-              child: const Text('Cancel', style: TextStyle(color: Color(0xFF8E93A4))),
+              child: const Text('Cancel', style: TextStyle(color: AppTheme.textMuted, fontWeight: FontWeight.w700)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF3B30),
+                backgroundColor: AppTheme.alarmOrange,
                 foregroundColor: Colors.white,
               ),
               onPressed: () => Navigator.of(dialogContext).pop(true),
@@ -174,7 +170,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Audit ledger cleared.'),
-            backgroundColor: Color(0xFFFF3B30),
+            backgroundColor: AppTheme.alarmOrange,
           ),
         );
       }
@@ -190,58 +186,60 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
         final auditLogs = widget.controller.auditLogs;
         final connectedCount = widget.controller.socketHub.connectedClientCount;
 
+        final bodyContent = SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              // ==========================================
+              // COMPONENT A: ACTIVE ROOM NODE
+              // ==========================================
+              _buildActiveRoomNodeCard(activeRoom, connectedCount),
+              const SizedBox(height: 16),
+
+              // ==========================================
+              // PEER NODES STATUS (Tethered / Authorized)
+              // ==========================================
+              _buildConnectedPeersCard(connectedCount),
+              const SizedBox(height: 20),
+
+              // ==========================================
+              // COMPONENT B: THE ACTION LEDGER RECEIPT LIST
+              // ==========================================
+              _buildLedgerHeader(auditLogs.length),
+              const SizedBox(height: 12),
+              _buildActionLedgerReceiptList(auditLogs),
+            ],
+          ),
+        );
+
+        if (widget.isEmbedded) {
+          return Container(
+            color: AppTheme.creamCanvas,
+            child: bodyContent,
+          );
+        }
+
         return Scaffold(
-          backgroundColor: const Color(0xFF0C0D12),
+          backgroundColor: AppTheme.creamCanvas,
           appBar: AppBar(
-            backgroundColor: const Color(0xFF0C0D12),
-            elevation: 0,
+            backgroundColor: AppTheme.creamCanvas,
             leading: IconButton(
-              icon: const Icon(Icons.arrow_back, color: Colors.white),
+              icon: const Icon(Icons.arrow_back, color: AppTheme.starkBlack),
               onPressed: () => Navigator.of(context).pop(),
             ),
             title: const Text(
               'HOSTEL HUB LEDGER',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.w700,
-                letterSpacing: 1.5,
-              ),
             ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.delete_sweep_outlined, color: Color(0xFFFF3B30)),
+                icon: const Icon(Icons.delete_sweep_outlined, color: AppTheme.alarmOrange),
                 tooltip: 'Clear Ledger',
                 onPressed: auditLogs.isEmpty ? null : _confirmClearAuditLogs,
               ),
             ],
           ),
-          body: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.stretch,
-              children: [
-                // ==========================================
-                // COMPONENT A: ACTIVE ROOM NODE
-                // ==========================================
-                _buildActiveRoomNodeCard(activeRoom, connectedCount),
-                const SizedBox(height: 16),
-
-                // ==========================================
-                // PEER NODES STATUS (Tethered / Authorized)
-                // ==========================================
-                _buildConnectedPeersCard(connectedCount),
-                const SizedBox(height: 24),
-
-                // ==========================================
-                // COMPONENT B: THE ACTION LEDGER RECEIPT LIST
-                // ==========================================
-                _buildLedgerHeader(auditLogs.length),
-                const SizedBox(height: 12),
-                _buildActionLedgerReceiptList(auditLogs),
-              ],
-            ),
-          ),
+          body: bodyContent,
         );
       },
     );
@@ -253,21 +251,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
     final hasCustomRoom = activeRoom != null;
 
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF16181F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(
-          color: const Color(0xFF0A84FF).withValues(alpha: 0.35),
-          width: 1.5,
-        ),
-        boxShadow: [
-          BoxShadow(
-            color: const Color(0xFF0A84FF).withValues(alpha: 0.08),
-            blurRadius: 16,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
+      decoration: AppTheme.panelDecoration(color: AppTheme.cardWhite),
       padding: const EdgeInsets.all(18),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -277,13 +261,13 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
             children: [
               // Active Room Badge (Component A Specification)
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF0A84FF).withValues(alpha: 0.18),
+                  color: AppTheme.neonCyan.withValues(alpha: 0.25),
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: const Color(0xFF0A84FF),
-                    width: 1,
+                    color: AppTheme.starkBlack,
+                    width: 2.0,
                   ),
                 ),
                 child: Row(
@@ -292,16 +276,18 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                     const Text(
                       '🏢 ROOM: ',
                       style: TextStyle(
-                        color: Color(0xFF0A84FF),
+                        fontFamily: 'serif',
+                        color: AppTheme.starkBlack,
                         fontSize: 14,
-                        fontWeight: FontWeight.w800,
+                        fontWeight: FontWeight.w900,
                         letterSpacing: 1.0,
                       ),
                     ),
                     Text(
                       roomName.toUpperCase(),
                       style: const TextStyle(
-                        color: Colors.white,
+                        fontFamily: 'serif',
+                        color: AppTheme.starkBlack,
                         fontSize: 14,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 1.2,
@@ -311,7 +297,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                 ),
               ),
               IconButton(
-                icon: const Icon(Icons.edit_note, color: Color(0xFF8E93A4), size: 24),
+                icon: const Icon(Icons.edit_note, color: AppTheme.starkBlack, size: 26),
                 tooltip: hasCustomRoom ? 'Edit Room' : 'Configure Room',
                 onPressed: _showCreateRoomDialog,
               ),
@@ -327,9 +313,10 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                     const Text(
                       'HOST CONNECTION CODE',
                       style: TextStyle(
-                        color: Color(0xFF8E93A4),
+                        fontFamily: 'serif',
+                        color: AppTheme.textMuted,
                         fontSize: 11,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.w800,
                         letterSpacing: 1.0,
                       ),
                     ),
@@ -337,9 +324,9 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                     Text(
                       hostCode,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
+                        color: AppTheme.starkBlack,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w900,
                         letterSpacing: 4.0,
                         fontFamily: 'monospace',
                       ),
@@ -351,14 +338,12 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
                   color: connectedCount > 0
-                      ? const Color(0xFF30D158).withValues(alpha: 0.15)
-                      : const Color(0xFF4A4E5D).withValues(alpha: 0.15),
+                      ? AppTheme.neonCyan.withValues(alpha: 0.25)
+                      : AppTheme.panelCream,
                   borderRadius: BorderRadius.circular(8),
                   border: Border.all(
-                    color: connectedCount > 0
-                        ? const Color(0xFF30D158)
-                        : const Color(0xFF4A4E5D),
-                    width: 1,
+                    color: AppTheme.starkBlack,
+                    width: 1.5,
                   ),
                 ),
                 child: Row(
@@ -370,19 +355,19 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                       decoration: BoxDecoration(
                         shape: BoxShape.circle,
                         color: connectedCount > 0
-                            ? const Color(0xFF30D158)
-                            : const Color(0xFF8E93A4),
+                            ? AppTheme.successGreen
+                            : AppTheme.textMuted,
+                        border: Border.all(color: AppTheme.starkBlack, width: 1.0),
                       ),
                     ),
                     const SizedBox(width: 8),
                     Text(
                       '$connectedCount Tethered',
-                      style: TextStyle(
-                        color: connectedCount > 0
-                            ? const Color(0xFF30D158)
-                            : const Color(0xFF8E93A4),
+                      style: const TextStyle(
+                        fontFamily: 'serif',
+                        color: AppTheme.starkBlack,
                         fontSize: 12,
-                        fontWeight: FontWeight.w700,
+                        fontWeight: FontWeight.w800,
                       ),
                     ),
                   ],
@@ -397,11 +382,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
 
   Widget _buildConnectedPeersCard(int connectedCount) {
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF16181F),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFF282B37)),
-      ),
+      decoration: AppTheme.panelDecoration(color: AppTheme.cardWhite),
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -411,19 +392,14 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
             children: [
               const Text(
                 'ROOMMATE PEER NODES',
-                style: TextStyle(
-                  color: Color(0xFF8E93A4),
-                  fontSize: 12,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 1.0,
-                ),
+                style: AppTheme.slabLabel,
               ),
               Text(
                 '${_pairedDevices.length} Authorized',
                 style: const TextStyle(
-                  color: Color(0xFF5D6273),
+                  color: AppTheme.textMuted,
                   fontSize: 12,
-                  fontWeight: FontWeight.w600,
+                  fontWeight: FontWeight.w700,
                 ),
               ),
             ],
@@ -433,24 +409,25 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
             const Center(
               child: Padding(
                 padding: EdgeInsets.all(16),
-                child: CircularProgressIndicator(color: Color(0xFF0A84FF)),
+                child: CircularProgressIndicator(color: AppTheme.starkBlack),
               ),
             )
           else if (_pairedDevices.isEmpty)
             Container(
               padding: const EdgeInsets.all(14),
               decoration: BoxDecoration(
-                color: const Color(0xFF1F222E),
+                color: AppTheme.creamCanvas,
                 borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: AppTheme.starkBlack, width: 1.5),
               ),
               child: const Row(
                 children: [
-                  Icon(Icons.info_outline, color: Color(0xFF8E93A4), size: 18),
+                  Icon(Icons.info_outline, color: AppTheme.textMuted, size: 18),
                   SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       'No peer devices authorized yet. Pair with roommates via Peer Authorization.',
-                      style: TextStyle(color: Color(0xFF8E93A4), fontSize: 13),
+                      style: TextStyle(color: AppTheme.textMuted, fontSize: 12, fontWeight: FontWeight.w600),
                     ),
                   ),
                 ],
@@ -467,12 +444,13 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                 return Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1F222E),
-                    borderRadius: BorderRadius.circular(10),
+                    color: isAuthorized
+                        ? AppTheme.neonCyan.withValues(alpha: 0.2)
+                        : AppTheme.creamCanvas,
+                    borderRadius: BorderRadius.circular(8),
                     border: Border.all(
-                      color: isAuthorized
-                          ? const Color(0xFF30D158).withValues(alpha: 0.4)
-                          : const Color(0xFF4A4E5D),
+                      color: AppTheme.starkBlack,
+                      width: 1.5,
                     ),
                   ),
                   child: Row(
@@ -482,16 +460,17 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                         Icons.person,
                         size: 16,
                         color: isAuthorized
-                            ? const Color(0xFF30D158)
-                            : const Color(0xFF8E93A4),
+                            ? AppTheme.starkBlack
+                            : AppTheme.textMuted,
                       ),
                       const SizedBox(width: 6),
                       Text(
                         friendName,
                         style: const TextStyle(
-                          color: Colors.white,
+                          fontFamily: 'serif',
+                          color: AppTheme.starkBlack,
                           fontSize: 13,
-                          fontWeight: FontWeight.w600,
+                          fontWeight: FontWeight.w800,
                         ),
                       ),
                     ],
@@ -510,31 +489,34 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
       children: [
         const Row(
           children: [
-            Icon(Icons.history_edu, color: Color(0xFFFF9500), size: 20),
+            Icon(Icons.history_edu, color: AppTheme.starkBlack, size: 20),
             SizedBox(width: 8),
             Text(
               'ACTION LEDGER RECEIPTS',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w700,
+                fontFamily: 'serif',
+                color: AppTheme.starkBlack,
+                fontSize: 13,
+                fontWeight: FontWeight.w900,
                 letterSpacing: 1.2,
               ),
             ),
           ],
         ),
         Container(
-          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
-            color: const Color(0xFF1F222E),
-            borderRadius: BorderRadius.circular(12),
+            color: AppTheme.panelCream,
+            borderRadius: BorderRadius.circular(10),
+            border: Border.all(color: AppTheme.starkBlack, width: 1.2),
           ),
           child: Text(
             '$receiptCount records',
             style: const TextStyle(
-              color: Color(0xFF8E93A4),
+              fontFamily: 'serif',
+              color: AppTheme.starkBlack,
               fontSize: 11,
-              fontWeight: FontWeight.w600,
+              fontWeight: FontWeight.w800,
             ),
           ),
         ),
@@ -545,26 +527,23 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
   Widget _buildActionLedgerReceiptList(List<Map<String, dynamic>> auditLogs) {
     if (auditLogs.isEmpty) {
       return Container(
-        padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-        decoration: BoxDecoration(
-          color: const Color(0xFF16181F),
-          borderRadius: BorderRadius.circular(16),
-          border: Border.all(color: const Color(0xFF282B37)),
-        ),
+        padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+        decoration: AppTheme.panelDecoration(color: AppTheme.cardWhite),
         child: const Column(
           children: [
             Icon(
               Icons.receipt_long_outlined,
-              size: 54,
-              color: Color(0xFF4A4E5D),
+              size: 50,
+              color: AppTheme.textLight,
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 14),
             Text(
               'No Deactivation Receipts',
               style: TextStyle(
-                color: Color(0xFF8E93A4),
+                fontFamily: 'serif',
+                color: AppTheme.starkBlack,
                 fontSize: 16,
-                fontWeight: FontWeight.w600,
+                fontWeight: FontWeight.w800,
               ),
             ),
             SizedBox(height: 6),
@@ -572,8 +551,9 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
               'Deactivation & snooze events will be logged here with actor attribution.',
               textAlign: TextAlign.center,
               style: TextStyle(
-                color: Color(0xFF5D6273),
-                fontSize: 13,
+                color: AppTheme.textMuted,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
               ),
             ),
           ],
@@ -585,7 +565,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
       shrinkWrap: true,
       physics: const NeverScrollableScrollPhysics(),
       itemCount: auditLogs.length,
-      separatorBuilder: (context, index) => const SizedBox(height: 8),
+      separatorBuilder: (context, index) => const SizedBox(height: 10),
       itemBuilder: (context, index) {
         final log = auditLogs[index];
         final actor = log['actor_name'] as String? ?? 'Unknown';
@@ -595,7 +575,7 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
 
         // Specification receipt format:
         // "• 07:02 AM - Alarm Silenced Remotely by Karthi."
-        // "• 06:45 AM - Snoozed 5 mins by Rahul."
+        // "• 06:45 AM - Snoozed Remotely by Rahul."
         final actionText = isDismiss
             ? 'Alarm Silenced Remotely by $actor.'
             : 'Snoozed Remotely by $actor.';
@@ -603,13 +583,19 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
 
         return Container(
           decoration: BoxDecoration(
-            color: const Color(0xFF16181F),
+            color: AppTheme.cardWhite,
             borderRadius: BorderRadius.circular(12),
             border: Border.all(
-              color: isDismiss
-                  ? const Color(0xFFFF3B30).withValues(alpha: 0.3)
-                  : const Color(0xFFFF9500).withValues(alpha: 0.3),
+              color: AppTheme.starkBlack,
+              width: 2.0,
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: AppTheme.starkBlack,
+                offset: Offset(3, 3),
+                blurRadius: 0,
+              ),
+            ],
           ),
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           child: Row(
@@ -620,13 +606,17 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: isDismiss
-                      ? const Color(0xFFFF3B30).withValues(alpha: 0.15)
-                      : const Color(0xFFFF9500).withValues(alpha: 0.15),
+                      ? AppTheme.alarmOrange.withValues(alpha: 0.2)
+                      : AppTheme.warningAmber.withValues(alpha: 0.2),
+                  border: Border.all(
+                    color: isDismiss ? AppTheme.alarmOrange : AppTheme.warningAmber,
+                    width: 1.5,
+                  ),
                 ),
                 child: Icon(
                   isDismiss ? Icons.alarm_off : Icons.snooze,
                   size: 18,
-                  color: isDismiss ? const Color(0xFFFF3B30) : const Color(0xFFFF9500),
+                  color: isDismiss ? AppTheme.alarmOrange : AppTheme.warningAmber,
                 ),
               ),
               const SizedBox(width: 12),
@@ -637,10 +627,11 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                     Text(
                       receiptLine,
                       style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        letterSpacing: 0.3,
+                        fontFamily: 'serif',
+                        color: AppTheme.starkBlack,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w800,
+                        letterSpacing: 0.2,
                       ),
                     ),
                     const SizedBox(height: 4),
@@ -649,11 +640,10 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                         Text(
                           action,
                           style: TextStyle(
-                            color: isDismiss
-                                ? const Color(0xFFFF3B30)
-                                : const Color(0xFFFF9500),
+                            fontFamily: 'serif',
+                            color: isDismiss ? AppTheme.alarmOrange : AppTheme.warningAmber,
                             fontSize: 11,
-                            fontWeight: FontWeight.w800,
+                            fontWeight: FontWeight.w900,
                             letterSpacing: 0.8,
                           ),
                         ),
@@ -661,8 +651,9 @@ class _HostelHubScreenState extends State<HostelHubScreen> {
                         Text(
                           'Actor: $actor',
                           style: const TextStyle(
-                            color: Color(0xFF8E93A4),
+                            color: AppTheme.textMuted,
                             fontSize: 11,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
                       ],

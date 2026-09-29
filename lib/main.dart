@@ -1,10 +1,12 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
 import 'screens/escalation_overlay.dart';
+import 'screens/eye_clock_widget.dart';
 import 'screens/hostel_hub_screen.dart';
 import 'screens/network_hud_widget.dart';
 import 'screens/pairing_screen.dart';
 import 'services/alarm_service.dart';
+import 'theme/app_theme.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -20,28 +22,8 @@ class ShutItOffApp extends StatelessWidget {
     return MaterialApp(
       title: 'ShutItOff',
       debugShowCheckedModeBanner: false,
-      themeMode: ThemeMode.dark,
-      darkTheme: ThemeData(
-        brightness: Brightness.dark,
-        scaffoldBackgroundColor: const Color(0xFF0C0D12),
-        colorScheme: const ColorScheme.dark(
-          primary: Color(0xFFFF3B30),
-          secondary: Color(0xFF30D158),
-          surface: Color(0xFF16181F),
-        ),
-        appBarTheme: const AppBarTheme(
-          backgroundColor: Color(0xFF0C0D12),
-          elevation: 0,
-          centerTitle: true,
-          titleTextStyle: TextStyle(
-            color: Colors.white,
-            fontSize: 20,
-            fontWeight: FontWeight.w700,
-            letterSpacing: 2.0,
-          ),
-        ),
-        useMaterial3: true,
-      ),
+      theme: AppTheme.lightTheme,
+      themeMode: ThemeMode.light,
       home: const AlarmHomeScreen(),
     );
   }
@@ -56,6 +38,7 @@ class AlarmHomeScreen extends StatefulWidget {
 
 class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
   final AlarmController _alarmController = AlarmController();
+  int _selectedTabIndex = 0;
 
   @override
   void initState() {
@@ -77,11 +60,11 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
       builder: (BuildContext context, Widget? child) {
         return Theme(
           data: Theme.of(context).copyWith(
-            colorScheme: const ColorScheme.dark(
-              primary: Color(0xFFFF3B30),
+            colorScheme: const ColorScheme.light(
+              primary: AppTheme.starkBlack,
               onPrimary: Colors.white,
-              surface: Color(0xFF1F222E),
-              onSurface: Colors.white,
+              surface: AppTheme.cardWhite,
+              onSurface: AppTheme.starkBlack,
             ),
           ),
           child: child!,
@@ -103,71 +86,168 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
       listenable: _alarmController,
       builder: (context, _) {
         return Scaffold(
+          backgroundColor: AppTheme.creamCanvas,
           appBar: AppBar(
             title: const Text('SHUT IT OFF'),
+            bottom: PreferredSize(
+              preferredSize: const Size.fromHeight(2.0),
+              child: Container(
+                color: AppTheme.starkBlack,
+                height: 2.0,
+              ),
+            ),
             actions: [
               IconButton(
-                icon: const Icon(Icons.meeting_room_outlined, color: Colors.white),
+                icon: const Icon(Icons.meeting_room_outlined, color: AppTheme.starkBlack),
                 tooltip: 'Hostel Hub Ledger',
                 onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (context) => HostelHubScreen(controller: _alarmController),
-                    ),
-                  );
+                  setState(() {
+                    _selectedTabIndex = 2;
+                  });
                 },
               ),
               IconButton(
-                icon: const Icon(Icons.people_outline, color: Colors.white),
+                icon: const Icon(Icons.people_outline, color: AppTheme.starkBlack),
                 tooltip: 'Peer Authorization',
                 onPressed: () {
-                  Navigator.of(context).push(
-                    MaterialPageRoute<void>(
-                      builder: (context) => const PairingScreen(),
-                    ),
-                  );
+                  setState(() {
+                    _selectedTabIndex = 1;
+                  });
                 },
               ),
             ],
           ),
           body: Stack(
             children: [
-              Column(
+              IndexedStack(
+                index: _selectedTabIndex,
                 children: [
-                  NetworkHudWidget(
+                  // ========================================================
+                  // VIEW PANEL A: THE ALARM CONFIGURATION SCHEDULER VIEW
+                  // ========================================================
+                  _buildSchedulerView(),
+
+                  // ========================================================
+                  // VIEW PANEL B: THE P2P HANDSHAKE EXCHANGE INPUT
+                  // ========================================================
+                  const PairingScreen(isEmbedded: true),
+
+                  // ========================================================
+                  // VIEW PANEL C: THE MULTI-PEER HOSTEL HUB TIMELINE MONITOR
+                  // ========================================================
+                  HostelHubScreen(
                     controller: _alarmController,
-                    onScanTap: () {
-                      _alarmController.discoveryService.startBrowsing();
-                    },
+                    isEmbedded: true,
                   ),
-                  if (_alarmController.isEscalated)
-                    EscalationOverlay(
-                      friendName: _alarmController.escalatedFriendName ?? 'Your Roommate',
-                      onWakeHim: () {
-                        _alarmController.sendForceWakeCommand();
-                      },
-                      onDismiss: () {
-                        _alarmController.triggerRemoteDismiss(
-                          _alarmController.activeRingingAlarmId ?? 0,
-                        );
-                      },
-                    ),
-                  Expanded(child: _buildAlarmList()),
                 ],
               ),
+
+              // Chronological Escalation Overlay
+              if (_alarmController.isEscalated)
+                EscalationOverlay(
+                  friendName: _alarmController.escalatedFriendName ?? 'Your Roommate',
+                  onWakeHim: () {
+                    _alarmController.sendForceWakeCommand();
+                  },
+                  onDismiss: () {
+                    _alarmController.triggerRemoteDismiss(
+                      _alarmController.activeRingingAlarmId ?? 0,
+                    );
+                  },
+                ),
+
+              // Aggressive Heads-Up Firing Overlay
               if (_alarmController.isCurrentlyRinging)
                 _buildAggressiveRingingOverlay(),
             ],
           ),
-          floatingActionButton: FloatingActionButton(
-            backgroundColor: const Color(0xFFFF3B30),
-            foregroundColor: Colors.white,
-            onPressed: _pickAndAddAlarm,
-            tooltip: 'Add Alarm',
-            child: const Icon(Icons.add, size: 28),
+          bottomNavigationBar: Container(
+            decoration: const BoxDecoration(
+              border: Border(
+                top: BorderSide(color: AppTheme.starkBlack, width: 2.0),
+              ),
+            ),
+            child: BottomNavigationBar(
+              currentIndex: _selectedTabIndex,
+              onTap: (index) {
+                setState(() {
+                  _selectedTabIndex = index;
+                });
+              },
+              backgroundColor: AppTheme.creamCanvas,
+              selectedItemColor: AppTheme.starkBlack,
+              unselectedItemColor: AppTheme.textMuted,
+              selectedLabelStyle: const TextStyle(
+                fontFamily: 'serif',
+                fontWeight: FontWeight.w900,
+                fontSize: 11,
+                letterSpacing: 1.0,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontFamily: 'serif',
+                fontWeight: FontWeight.w700,
+                fontSize: 11,
+                letterSpacing: 0.5,
+              ),
+              items: const [
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.alarm),
+                  activeIcon: Icon(Icons.alarm_on),
+                  label: 'ALARMS',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.handshake_outlined),
+                  activeIcon: Icon(Icons.handshake),
+                  label: 'HANDSHAKE',
+                ),
+                BottomNavigationBarItem(
+                  icon: Icon(Icons.domain_outlined),
+                  activeIcon: Icon(Icons.domain),
+                  label: 'HOSTEL HUB',
+                ),
+              ],
+            ),
           ),
+          floatingActionButton: _selectedTabIndex == 0
+              ? FloatingActionButton(
+                  backgroundColor: AppTheme.starkBlack,
+                  foregroundColor: Colors.white,
+                  onPressed: _pickAndAddAlarm,
+                  tooltip: 'Add Alarm',
+                  shape: const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(16)),
+                    side: BorderSide(color: AppTheme.starkBlack, width: 2.0),
+                  ),
+                  child: const Icon(Icons.add, size: 28),
+                )
+              : null,
         );
       },
+    );
+  }
+
+  Widget _buildSchedulerView() {
+    return SingleChildScrollView(
+      child: Column(
+        children: [
+          // Step 2 Requirement: Interface Glow Node (Eye-Clock Widget)
+          EyeClockWidget(
+            controller: _alarmController,
+          ),
+
+          // Network Connection HUD
+          NetworkHudWidget(
+            controller: _alarmController,
+            onScanTap: () {
+              _alarmController.discoveryService.startBrowsing();
+            },
+          ),
+
+          // Custom Alarms List
+          _buildAlarmList(),
+          const SizedBox(height: 80),
+        ],
+      ),
     );
   }
 
@@ -175,30 +255,36 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
     final alarms = _alarmController.alarms;
 
     if (alarms.isEmpty) {
-      return const Center(
-        child: Column(
+      return Container(
+        margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+        padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 36),
+        decoration: AppTheme.panelDecoration(),
+        child: const Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             Icon(
               Icons.alarm_off_outlined,
-              size: 72,
-              color: Color(0xFF4A4E5D),
+              size: 58,
+              color: AppTheme.textMuted,
             ),
-            SizedBox(height: 16),
+            SizedBox(height: 14),
             Text(
               'No Alarms Set',
               style: TextStyle(
-                color: Color(0xFF8E93A4),
+                fontFamily: 'serif',
+                color: AppTheme.starkBlack,
                 fontSize: 18,
-                fontWeight: FontWeight.w500,
+                fontWeight: FontWeight.w900,
+                letterSpacing: 1.0,
               ),
             ),
-            SizedBox(height: 8),
+            SizedBox(height: 6),
             Text(
-              'Tap + to create a persistent alarm',
+              'Tap + below to create a persistent local alarm',
               style: TextStyle(
-                color: Color(0xFF5D6273),
-                fontSize: 14,
+                color: AppTheme.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
               ),
             ),
           ],
@@ -207,7 +293,9 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
     }
 
     return ListView.builder(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      shrinkWrap: true,
+      physics: const NeverScrollableScrollPhysics(),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       itemCount: alarms.length,
       itemBuilder: (context, index) {
         final alarm = alarms[index];
@@ -223,26 +311,20 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
             padding: const EdgeInsets.only(right: 20),
             margin: const EdgeInsets.symmetric(vertical: 8),
             decoration: BoxDecoration(
-              color: const Color(0xFF8B0000),
-              borderRadius: BorderRadius.circular(16),
+              color: AppTheme.alarmOrange,
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: AppTheme.starkBlack, width: 2.0),
             ),
-            child: const Icon(Icons.delete_forever, color: Colors.white),
+            child: const Icon(Icons.delete_forever, color: Colors.white, size: 28),
           ),
           onDismissed: (_) {
             _alarmController.deleteAlarm(id);
           },
           child: Container(
-            margin: const EdgeInsets.symmetric(vertical: 8),
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-            decoration: BoxDecoration(
-              color: const Color(0xFF161822),
-              borderRadius: BorderRadius.circular(16),
-              border: Border.all(
-                color: isEnabled
-                    ? const Color(0xFFFF3B30).withAlpha(80)
-                    : const Color(0xFF282B37),
-                width: 1.2,
-              ),
+            margin: const EdgeInsets.symmetric(vertical: 6),
+            padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 16),
+            decoration: AppTheme.panelDecoration(
+              color: isEnabled ? AppTheme.cardWhite : AppTheme.panelCream,
             ),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -253,21 +335,35 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                     Text(
                       timeString,
                       style: TextStyle(
-                        fontSize: 38,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.5,
-                        color: isEnabled ? Colors.white : const Color(0xFF6B7280),
+                        fontFamily: 'serif',
+                        fontSize: 34,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 2.0,
+                        color: isEnabled ? AppTheme.starkBlack : AppTheme.textMuted,
                       ),
                     ),
                     const SizedBox(height: 4),
-                    Text(
-                      isEnabled ? 'Active' : 'Disabled',
-                      style: TextStyle(
-                        fontSize: 13,
-                        fontWeight: FontWeight.w600,
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      decoration: BoxDecoration(
                         color: isEnabled
-                            ? const Color(0xFF30D158)
-                            : const Color(0xFF6B7280),
+                            ? AppTheme.neonCyan.withValues(alpha: 0.25)
+                            : AppTheme.textLight.withValues(alpha: 0.2),
+                        borderRadius: BorderRadius.circular(6),
+                        border: Border.all(
+                          color: isEnabled ? AppTheme.starkBlack : AppTheme.textMuted,
+                          width: 1.0,
+                        ),
+                      ),
+                      child: Text(
+                        isEnabled ? 'ACTIVE SCHEDULE' : 'DISABLED',
+                        style: TextStyle(
+                          fontFamily: 'serif',
+                          fontSize: 10,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 0.8,
+                          color: isEnabled ? AppTheme.starkBlack : AppTheme.textMuted,
+                        ),
                       ),
                     ),
                   ],
@@ -276,16 +372,16 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                   children: [
                     Switch(
                       value: isEnabled,
-                      activeThumbColor: const Color(0xFFFF3B30),
-                      activeTrackColor: const Color(0xFFFF3B30).withAlpha(100),
-                      inactiveThumbColor: const Color(0xFF555A69),
-                      inactiveTrackColor: const Color(0xFF222530),
+                      activeThumbColor: AppTheme.starkBlack,
+                      activeTrackColor: AppTheme.neonCyan.withValues(alpha: 0.5),
+                      inactiveThumbColor: AppTheme.textMuted,
+                      inactiveTrackColor: AppTheme.panelCream,
                       onChanged: (value) {
                         _alarmController.toggleAlarm(id, value);
                       },
                     ),
                     IconButton(
-                      icon: const Icon(Icons.delete_outline, color: Color(0xFF7A7F91)),
+                      icon: const Icon(Icons.delete_outline, color: AppTheme.alarmOrange),
                       onPressed: () => _alarmController.deleteAlarm(id),
                       tooltip: 'Delete Alarm',
                     ),
@@ -309,26 +405,43 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
 
     return Positioned.fill(
       child: Container(
-        color: const Color(0xFF0F0000).withAlpha(248),
+        color: AppTheme.creamCanvas,
         padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 32),
         child: SafeArea(
           child: Column(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              const Column(
+              Column(
                 children: [
-                  SizedBox(height: 20),
-                  Icon(
-                    Icons.notifications_active,
-                    size: 80,
-                    color: Color(0xFFFF3B30),
+                  const SizedBox(height: 16),
+                  Container(
+                    width: 90,
+                    height: 90,
+                    decoration: BoxDecoration(
+                      color: AppTheme.alarmOrange,
+                      shape: BoxShape.circle,
+                      border: Border.all(color: AppTheme.starkBlack, width: 3.0),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: AppTheme.starkBlack,
+                          offset: Offset(4, 4),
+                          blurRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: const Icon(
+                      Icons.notifications_active,
+                      size: 54,
+                      color: Colors.white,
+                    ),
                   ),
-                  SizedBox(height: 16),
-                  Text(
+                  const SizedBox(height: 18),
+                  const Text(
                     'SHUT IT OFF NOW',
                     style: TextStyle(
-                      color: Color(0xFFFF3B30),
-                      fontSize: 22,
+                      fontFamily: 'serif',
+                      color: AppTheme.alarmOrange,
+                      fontSize: 24,
                       fontWeight: FontWeight.w900,
                       letterSpacing: 3.0,
                     ),
@@ -337,26 +450,45 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
               ),
               Column(
                 children: [
-                  Text(
-                    displayTime,
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 64,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 2.0,
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                    decoration: AppTheme.panelDecoration(
+                      color: AppTheme.cardWhite,
+                    ),
+                    child: Text(
+                      displayTime,
+                      style: const TextStyle(
+                        fontFamily: 'serif',
+                        color: AppTheme.starkBlack,
+                        fontSize: 60,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 4.0,
+                      ),
                     ),
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _alarmController.ringingDurationSeconds >= 60
-                        ? '⚠️ ESCALATED TO ROOMMATES (${_alarmController.ringingDurationSeconds}s)'
-                        : 'Alarm ringing: ${_alarmController.ringingDurationSeconds}s (Escalates at 60s)',
-                    style: TextStyle(
+                  const SizedBox(height: 12),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
                       color: _alarmController.ringingDurationSeconds >= 60
-                          ? const Color(0xFFFF6D00)
-                          : const Color(0xFFB0B3C0),
-                      fontSize: 15,
-                      fontWeight: FontWeight.w700,
+                          ? AppTheme.alarmOrange
+                          : AppTheme.panelCream,
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: AppTheme.starkBlack, width: 1.5),
+                    ),
+                    child: Text(
+                      _alarmController.ringingDurationSeconds >= 60
+                          ? '⚠️ ESCALATED TO ROOMMATES (${_alarmController.ringingDurationSeconds}s)'
+                          : 'Ringing: ${_alarmController.ringingDurationSeconds}s (Escalates at 60s)',
+                      style: TextStyle(
+                        fontFamily: 'serif',
+                        color: _alarmController.ringingDurationSeconds >= 60
+                            ? Colors.white
+                            : AppTheme.starkBlack,
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.8,
+                      ),
                     ),
                   ),
                 ],
@@ -369,20 +501,21 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                       _alarmController.turnOffLocalAlarm(activeId);
                     },
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 20),
                   SizedBox(
                     width: double.infinity,
-                    height: 56,
+                    height: 54,
                     child: OutlinedButton(
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(
-                          color: Color(0xFFFF9F0A),
+                          color: AppTheme.starkBlack,
                           width: 2.0,
                         ),
                         shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(28),
+                          borderRadius: BorderRadius.circular(14),
                         ),
-                        backgroundColor: const Color(0xFFFF9F0A).withAlpha(25),
+                        backgroundColor: AppTheme.cardWhite,
+                        elevation: 0,
                       ),
                       onPressed: () {
                         _alarmController.snoozeLocalAlarm(activeId, 5);
@@ -390,9 +523,10 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
                       child: const Text(
                         '[SNOOZE] (5 MIN)',
                         style: TextStyle(
-                          color: Color(0xFFFF9F0A),
+                          fontFamily: 'serif',
+                          color: AppTheme.starkBlack,
                           fontSize: 16,
-                          fontWeight: FontWeight.w800,
+                          fontWeight: FontWeight.w900,
                           letterSpacing: 1.5,
                         ),
                       ),
@@ -433,12 +567,19 @@ class _SwipeToTurnOffBarState extends State<SwipeToTurnOffBar> {
           width: constraints.maxWidth,
           height: _barHeight,
           decoration: BoxDecoration(
-            color: const Color(0xFF1E0707),
+            color: AppTheme.cardWhite,
             borderRadius: BorderRadius.circular(32),
             border: Border.all(
-              color: const Color(0xFFFF3B30),
-              width: 2,
+              color: AppTheme.starkBlack,
+              width: 2.5,
             ),
+            boxShadow: const [
+              BoxShadow(
+                color: AppTheme.starkBlack,
+                offset: Offset(4, 4),
+                blurRadius: 0,
+              ),
+            ],
           ),
           child: Stack(
             alignment: Alignment.centerLeft,
@@ -447,7 +588,7 @@ class _SwipeToTurnOffBarState extends State<SwipeToTurnOffBar> {
                 width: (_dragPosition + _thumbWidth + 4).clamp(0.0, constraints.maxWidth),
                 height: _barHeight,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFFF3B30).withAlpha(80),
+                  color: AppTheme.alarmOrange.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(32),
                 ),
               ),
@@ -455,7 +596,8 @@ class _SwipeToTurnOffBarState extends State<SwipeToTurnOffBar> {
                 child: Text(
                   '[TURN OFF]  >>>',
                   style: TextStyle(
-                    color: Colors.white,
+                    fontFamily: 'serif',
+                    color: AppTheme.starkBlack,
                     fontSize: 16,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 2.0,
@@ -483,14 +625,15 @@ class _SwipeToTurnOffBarState extends State<SwipeToTurnOffBar> {
                   child: Container(
                     width: _thumbWidth,
                     height: _barHeight - 8.0,
-                    decoration: const BoxDecoration(
-                      color: Color(0xFFFF3B30),
+                    decoration: BoxDecoration(
+                      color: AppTheme.alarmOrange,
                       shape: BoxShape.circle,
-                      boxShadow: [
+                      border: Border.all(color: AppTheme.starkBlack, width: 2.0),
+                      boxShadow: const [
                         BoxShadow(
-                          color: Color(0xFFFF3B30),
-                          blurRadius: 10,
-                          spreadRadius: 1,
+                          color: AppTheme.starkBlack,
+                          offset: Offset(2, 2),
+                          blurRadius: 0,
                         ),
                       ],
                     ),
