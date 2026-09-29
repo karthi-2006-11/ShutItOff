@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
+import 'screens/pairing_screen.dart';
 import 'services/alarm_service.dart';
 
 void main() async {
@@ -101,6 +102,19 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
         return Scaffold(
           appBar: AppBar(
             title: const Text('SHUT IT OFF'),
+            actions: [
+              IconButton(
+                icon: const Icon(Icons.people_outline, color: Colors.white),
+                tooltip: 'Peer Authorization',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => const PairingScreen(),
+                    ),
+                  );
+                },
+              ),
+            ],
           ),
           body: Stack(
             children: [

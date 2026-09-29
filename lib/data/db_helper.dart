@@ -19,8 +19,9 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 1,
+      version: 2,
       onCreate: _createDB,
+      onUpgrade: _upgradeDB,
     );
   }
 
@@ -32,7 +33,30 @@ class DBHelper {
         is_enabled INTEGER NOT NULL
       )
     ''');
+
+    await _createPairedDevicesTable(db);
   }
+
+  Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
+    if (oldVersion < 2) {
+      await _createPairedDevicesTable(db);
+    }
+  }
+
+  Future<void> _createPairedDevicesTable(Database db) async {
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS paired_devices (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        friend_name TEXT NOT NULL,
+        connection_code TEXT NOT NULL,
+        is_authorized INTEGER NOT NULL,
+        can_snooze INTEGER NOT NULL,
+        can_turn_off INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  // --- custom_alarms helper methods ---
 
   Future<int> insertAlarm(String alarmTime, {bool isEnabled = true}) async {
     final db = await database;
@@ -89,6 +113,69 @@ class DBHelper {
     final db = await database;
     return await db.delete(
       'custom_alarms',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  // --- paired_devices helper methods ---
+
+  Future<int> insertPairing(Map<String, dynamic> row) async {
+    final db = await database;
+    return await db.insert(
+      'paired_devices',
+      row,
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getPairedDevices() async {
+    final db = await database;
+    return await db.query('paired_devices', orderBy: 'id DESC');
+  }
+
+  Future<Map<String, dynamic>?> getPairedDevice(int id) async {
+    final db = await database;
+    final results = await db.query(
+      'paired_devices',
+      where: 'id = ?',
+      whereArgs: [id],
+      limit: 1,
+    );
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
+  }
+
+  Future<Map<String, dynamic>?> getPairedDeviceByCode(String connectionCode) async {
+    final db = await database;
+    final results = await db.query(
+      'paired_devices',
+      where: 'connection_code = ?',
+      whereArgs: [connectionCode],
+      limit: 1,
+    );
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
+  }
+
+  Future<int> revokeAuthorization(int id) async {
+    final db = await database;
+    return await db.update(
+      'paired_devices',
+      {'is_authorized': 0},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> deletePairing(int id) async {
+    final db = await database;
+    return await db.delete(
+      'paired_devices',
       where: 'id = ?',
       whereArgs: [id],
     );
