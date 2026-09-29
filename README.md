@@ -1,5 +1,13 @@
 # 🔔 ShutItOff — Remote Control Alarm App for Roommates
 
+<div align="center">
+
+[![Download Android APK](https://shields.io)](https://github.com)
+
+📲 **Latest Build v1.0.0 Compiled Successfully.** Download the standalone APK installer directly onto your Android device to skip system clock constraints.
+
+</div>
+
 **ShutItOff** is a local peer-to-peer mobile application built with Flutter designed specifically for hostels, dorms, and shared apartments. It solves a highly universal pain point: **turning off a heavy-sleeping roommate's alarm when they refuse to wake up and their phone won't stop ringing.**
 
 Because mobile operating systems strictly block third-party applications from controlling the system's default Clock app, **ShutItOff bypasses these constraints by implementing its own internal custom alarm scheduler background engine.** When an alarm fires, it securely synchronizes state changes across a local network tunnel, allowing authorized roommates to remotely `Snooze` or `Turn Off` the alarm right from their own devices.
