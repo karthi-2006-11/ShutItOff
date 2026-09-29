@@ -3,6 +3,8 @@ import 'dart:ui';
 import 'package:flutter/foundation.dart';
 import '../data/db_helper.dart';
 import '../services/alarm_service.dart';
+import '../services/network_discovery.dart';
+import '../services/socket_hub.dart';
 
 class AlarmController extends ChangeNotifier {
   bool isCurrentlyRinging = false;
@@ -11,9 +13,28 @@ class AlarmController extends ChangeNotifier {
   List<Map<String, dynamic>> alarms = [];
   ReceivePort? _receivePort;
 
+  final SocketHub socketHub = SocketHub();
+  final NetworkDiscoveryService discoveryService = NetworkDiscoveryService();
+
   Future<void> initialize() async {
     _setupIsolateListener();
+    _setupSocketListener();
     await loadAlarms();
+  }
+
+  void _setupSocketListener() {
+    socketHub.onEventReceived = (String event, Map<String, dynamic> payload) {
+      if (event == SocketHub.eventAlarmRinging) {
+        final id = payload['alarm_id'] as int?;
+        isCurrentlyRinging = true;
+        activeRingingAlarmId = id;
+        notifyListeners();
+      } else if (event == SocketHub.eventRemoteDismiss) {
+        // STEP 4 Requirement: If "REMOTE_DISMISS" is received, kill audio loop immediately
+        final id = payload['alarm_id'] as int? ?? activeRingingAlarmId ?? 0;
+        turnOffLocalAlarm(id);
+      }
+    };
   }
 
   void _setupIsolateListener() {
@@ -27,16 +48,22 @@ class AlarmController extends ChangeNotifier {
     );
 
     _receivePort!.listen((dynamic message) {
+      int? id;
       if (message is Map && message['action'] == 'ALARM_FIRED') {
-        final id = message['id'] as int?;
-        if (id != null) {
-          isCurrentlyRinging = true;
-          activeRingingAlarmId = id;
-          notifyListeners();
-        }
+        id = message['id'] as int?;
       } else if (message is int) {
+        id = message;
+      }
+
+      if (id != null) {
         isCurrentlyRinging = true;
-        activeRingingAlarmId = message;
+        activeRingingAlarmId = id;
+
+        // STEP 4: Inside execution callback, push out "ALARM_RINGING" over active socket connections
+        socketHub.hostSocketServer().then((_) {
+          socketHub.broadcastAlarmRinging(id);
+        });
+
         notifyListeners();
       }
     });
@@ -96,6 +123,10 @@ class AlarmController extends ChangeNotifier {
     isCurrentlyRinging = false;
     activeRingingAlarmId = null;
 
+    // Send REMOTE_DISMISS notification across network & stop server
+    socketHub.sendRemoteDismiss(id);
+    socketHub.stopServer();
+
     final match = alarms.where((element) => element['id'] == id);
     if (match.isNotEmpty) {
       final alarm = match.first;
@@ -117,16 +148,24 @@ class AlarmController extends ChangeNotifier {
     isCurrentlyRinging = false;
     activeRingingAlarmId = null;
 
+    socketHub.stopServer();
+
     final targetTime = DateTime.now().add(Duration(minutes: minutes));
     AlarmService.scheduleAlarm(id: id, targetTime: targetTime);
 
     notifyListeners();
   }
 
+  void triggerRemoteDismiss(int id) {
+    socketHub.sendRemoteDismiss(id);
+  }
+
   @override
   void dispose() {
     _receivePort?.close();
     IsolateNameServer.removePortNameMapping(AlarmService.isolatePortName);
+    socketHub.dispose();
+    discoveryService.dispose();
     super.dispose();
   }
 }

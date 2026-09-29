@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
+import 'screens/network_hud_widget.dart';
 import 'screens/pairing_screen.dart';
 import 'services/alarm_service.dart';
 
@@ -118,7 +119,17 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
           ),
           body: Stack(
             children: [
-              _buildAlarmList(),
+              Column(
+                children: [
+                  NetworkHudWidget(
+                    controller: _alarmController,
+                    onScanTap: () {
+                      _alarmController.discoveryService.startBrowsing();
+                    },
+                  ),
+                  Expanded(child: _buildAlarmList()),
+                ],
+              ),
               if (_alarmController.isCurrentlyRinging)
                 _buildAggressiveRingingOverlay(),
             ],
