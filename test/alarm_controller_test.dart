@@ -1,8 +1,35 @@
+import 'package:flutter/services.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:shutitoff/controllers/alarm_controller.dart';
+import 'package:sqflite/sqflite.dart';
 
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
+
+  setUpAll(() {
+    databaseFactory = databaseFactorySqflitePlugin;
+
+    TestDefaultBinaryMessengerBinding.instance.defaultBinaryMessenger
+        .setMockMethodCallHandler(const MethodChannel('com.tekartik.sqflite'),
+            (MethodCall methodCall) async {
+      if (methodCall.method == 'getDatabasesPath') {
+        return '.';
+      }
+      if (methodCall.method == 'openDatabase') {
+        return 1;
+      }
+      if (methodCall.method == 'query') {
+        return <Map<String, dynamic>>[];
+      }
+      if (methodCall.method == 'insert') {
+        return 1;
+      }
+      if (methodCall.method == 'delete') {
+        return 0;
+      }
+      return null;
+    });
+  });
 
   group('AlarmController Unit Tests', () {
     late AlarmController controller;

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'controllers/alarm_controller.dart';
 import 'screens/escalation_overlay.dart';
+import 'screens/hostel_hub_screen.dart';
 import 'screens/network_hud_widget.dart';
 import 'screens/pairing_screen.dart';
 import 'services/alarm_service.dart';
@@ -105,6 +106,17 @@ class _AlarmHomeScreenState extends State<AlarmHomeScreen> {
           appBar: AppBar(
             title: const Text('SHUT IT OFF'),
             actions: [
+              IconButton(
+                icon: const Icon(Icons.meeting_room_outlined, color: Colors.white),
+                tooltip: 'Hostel Hub Ledger',
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute<void>(
+                      builder: (context) => HostelHubScreen(controller: _alarmController),
+                    ),
+                  );
+                },
+              ),
               IconButton(
                 icon: const Icon(Icons.people_outline, color: Colors.white),
                 tooltip: 'Peer Authorization',

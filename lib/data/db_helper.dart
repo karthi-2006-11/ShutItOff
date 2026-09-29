@@ -19,7 +19,7 @@ class DBHelper {
 
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -35,11 +35,15 @@ class DBHelper {
     ''');
 
     await _createPairedDevicesTable(db);
+    await _createHostelTables(db);
   }
 
   Future<void> _upgradeDB(Database db, int oldVersion, int newVersion) async {
     if (oldVersion < 2) {
       await _createPairedDevicesTable(db);
+    }
+    if (oldVersion < 3) {
+      await _createHostelTables(db);
     }
   }
 
@@ -52,6 +56,28 @@ class DBHelper {
         is_authorized INTEGER NOT NULL,
         can_snooze INTEGER NOT NULL,
         can_turn_off INTEGER NOT NULL
+      )
+    ''');
+  }
+
+  Future<void> _createHostelTables(Database db) async {
+    // Table A: hostel_rooms
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS hostel_rooms (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        room_name TEXT NOT NULL,
+        host_code TEXT NOT NULL
+      )
+    ''');
+
+    // Table B: alarm_audit_logs
+    await db.execute('''
+      CREATE TABLE IF NOT EXISTS alarm_audit_logs (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        alarm_id INTEGER,
+        actor_name TEXT NOT NULL,
+        action_type TEXT NOT NULL,
+        timestamp TEXT NOT NULL
       )
     ''');
   }
@@ -179,6 +205,63 @@ class DBHelper {
       where: 'id = ?',
       whereArgs: [id],
     );
+  }
+
+  // --- Phase 5: hostel_rooms & alarm_audit_logs helper methods ---
+
+  Future<int> createRoom(String roomName, String hostCode) async {
+    final db = await database;
+    return await db.insert(
+      'hostel_rooms',
+      {
+        'room_name': roomName,
+        'host_code': hostCode,
+      },
+      conflictAlgorithm: ConflictAlgorithm.replace,
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getRooms() async {
+    final db = await database;
+    return await db.query('hostel_rooms', orderBy: 'id DESC');
+  }
+
+  Future<Map<String, dynamic>?> getActiveRoom() async {
+    final db = await database;
+    final results = await db.query('hostel_rooms', orderBy: 'id DESC', limit: 1);
+    if (results.isNotEmpty) {
+      return results.first;
+    }
+    return null;
+  }
+
+  Future<int> insertAuditLog(int alarmId, String actor, String action) async {
+    final db = await database;
+    final now = DateTime.now();
+    final hour = now.hour > 12 ? now.hour - 12 : (now.hour == 0 ? 12 : now.hour);
+    final period = now.hour >= 12 ? 'PM' : 'AM';
+    final minuteStr = now.minute.toString().padLeft(2, '0');
+    final formattedTime = '${hour.toString().padLeft(2, '0')}:$minuteStr $period';
+
+    return await db.insert(
+      'alarm_audit_logs',
+      {
+        'alarm_id': alarmId,
+        'actor_name': actor,
+        'action_type': action,
+        'timestamp': formattedTime,
+      },
+    );
+  }
+
+  Future<List<Map<String, dynamic>>> getAuditLogs() async {
+    final db = await database;
+    return await db.query('alarm_audit_logs', orderBy: 'id DESC');
+  }
+
+  Future<int> clearAuditLogs() async {
+    final db = await database;
+    return await db.delete('alarm_audit_logs');
   }
 
   Future<void> close() async {

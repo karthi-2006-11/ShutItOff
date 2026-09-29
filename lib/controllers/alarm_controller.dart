@@ -17,11 +17,17 @@ class AlarmController extends ChangeNotifier {
   bool isEscalated = false;
   String? escalatedFriendName;
 
+  // Phase 5: Multi-Node Ledger & Shared Group Spaces
   List<Map<String, dynamic>> alarms = [];
+  List<Map<String, dynamic>> auditLogs = [];
+  Map<String, dynamic>? activeRoom;
+
   ReceivePort? _receivePort;
 
   final SocketHub socketHub = SocketHub();
   final NetworkDiscoveryService discoveryService = NetworkDiscoveryService();
+
+  bool _isDisposed = false;
 
   AlarmController() {
     _setupSocketListener();
@@ -30,6 +36,8 @@ class AlarmController extends ChangeNotifier {
   Future<void> initialize() async {
     _setupIsolateListener();
     await loadAlarms();
+    await loadAuditLogs();
+    await loadActiveRoom();
   }
 
   void _setupSocketListener() {
@@ -41,7 +49,13 @@ class AlarmController extends ChangeNotifier {
         notifyListeners();
       } else if (event == SocketHub.eventRemoteDismiss) {
         final id = payload['alarm_id'] as int? ?? activeRingingAlarmId ?? 0;
-        turnOffLocalAlarm(id);
+        final actor = payload['actor_name'] as String? ?? 'Roommate';
+        turnOffLocalAlarm(id, actorName: actor, logAction: true);
+      } else if (event == SocketHub.eventRemoteSnooze) {
+        final id = payload['alarm_id'] as int? ?? activeRingingAlarmId ?? 0;
+        final actor = payload['actor_name'] as String? ?? 'Roommate';
+        final minutes = payload['minutes'] as int? ?? 5;
+        snoozeLocalAlarm(id, minutes, actorName: actor, logAction: true);
       } else if (event == SocketHub.eventAlarmEscalated) {
         // Roommate's client captures ALARM_ESCALATED: activate override UI
         isEscalated = true;
@@ -77,7 +91,7 @@ class AlarmController extends ChangeNotifier {
         isCurrentlyRinging = true;
         activeRingingAlarmId = id;
 
-        // Step 1: Start 60-second watchdog counter loop the exact instant alarm fires
+        // Start 60-second watchdog counter loop the exact instant alarm fires
         _startEscalationWatchdog(id);
 
         socketHub.hostSocketServer().then((_) {
@@ -96,7 +110,6 @@ class AlarmController extends ChangeNotifier {
 
     _escalationTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       ringingDurationSeconds++;
-      // Step 1 & 2: When crossing 60 seconds, broadcast "ALARM_ESCALATED"
       if (ringingDurationSeconds == 60) {
         isEscalated = true;
         socketHub.broadcastAlarmEscalated(alarmId: id);
@@ -108,6 +121,26 @@ class AlarmController extends ChangeNotifier {
   Future<void> loadAlarms() async {
     alarms = await DBHelper.instance.getAlarms();
     notifyListeners();
+  }
+
+  Future<void> loadAuditLogs() async {
+    auditLogs = await DBHelper.instance.getAuditLogs();
+    notifyListeners();
+  }
+
+  Future<void> loadActiveRoom() async {
+    activeRoom = await DBHelper.instance.getActiveRoom();
+    notifyListeners();
+  }
+
+  Future<void> clearAuditLogs() async {
+    await DBHelper.instance.clearAuditLogs();
+    await loadAuditLogs();
+  }
+
+  Future<void> createRoom(String roomName, String hostCode) async {
+    await DBHelper.instance.createRoom(roomName, hostCode);
+    await loadActiveRoom();
   }
 
   DateTime computeNextAlarmTime(String timeString, {bool forceNextDay = false}) {
@@ -153,7 +186,7 @@ class AlarmController extends ChangeNotifier {
     await loadAlarms();
   }
 
-  void turnOffLocalAlarm(int id) {
+  void turnOffLocalAlarm(int id, {String? actorName, bool logAction = true}) {
     _escalationTimer?.cancel();
     _escalationTimer = null;
     ringingDurationSeconds = 0;
@@ -165,8 +198,18 @@ class AlarmController extends ChangeNotifier {
     isCurrentlyRinging = false;
     activeRingingAlarmId = null;
 
+    final actor = actorName ?? 'Host (Self)';
+
+    if (logAction) {
+      try {
+        DBHelper.instance.insertAuditLog(id, actor, 'DISMISS').then((_) {
+          loadAuditLogs();
+        }).catchError((_) {});
+      } catch (_) {}
+    }
+
     // Send REMOTE_DISMISS notification across network & stop server
-    socketHub.sendRemoteDismiss(id);
+    socketHub.sendRemoteDismiss(id, actor);
     socketHub.stopServer();
 
     final match = alarms.where((element) => element['id'] == id);
@@ -184,7 +227,7 @@ class AlarmController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void snoozeLocalAlarm(int id, int minutes) {
+  void snoozeLocalAlarm(int id, int minutes, {String? actorName, bool logAction = true}) {
     _escalationTimer?.cancel();
     _escalationTimer = null;
     ringingDurationSeconds = 0;
@@ -196,6 +239,17 @@ class AlarmController extends ChangeNotifier {
     isCurrentlyRinging = false;
     activeRingingAlarmId = null;
 
+    final actor = actorName ?? 'Host (Self)';
+
+    if (logAction) {
+      try {
+        DBHelper.instance.insertAuditLog(id, actor, 'SNOOZE').then((_) {
+          loadAuditLogs();
+        }).catchError((_) {});
+      } catch (_) {}
+    }
+
+    socketHub.sendRemoteSnooze(id, actor, minutes);
     socketHub.stopServer();
 
     final targetTime = DateTime.now().add(Duration(minutes: minutes));
@@ -204,8 +258,20 @@ class AlarmController extends ChangeNotifier {
     notifyListeners();
   }
 
-  void triggerRemoteDismiss(int id) {
-    socketHub.sendRemoteDismiss(id);
+  void triggerRemoteDismiss(int id, [String? actorName]) {
+    socketHub.sendRemoteDismiss(id, actorName);
+  }
+
+  void triggerRemoteSnooze(int id, [String? actorName, int minutes = 5]) {
+    socketHub.sendRemoteSnooze(id, actorName, minutes);
+  }
+
+  void sendRemoteDismissWithActor({int? alarmId, required String actorName}) {
+    socketHub.sendRemoteDismiss(alarmId ?? activeRingingAlarmId, actorName);
+  }
+
+  void sendRemoteSnoozeWithActor({int? alarmId, required String actorName, int minutes = 5}) {
+    socketHub.sendRemoteSnooze(alarmId ?? activeRingingAlarmId, actorName, minutes);
   }
 
   /// Roommate taps [WAKE HIM] to force max volume frantic mode on host phone
@@ -214,7 +280,15 @@ class AlarmController extends ChangeNotifier {
   }
 
   @override
+  void notifyListeners() {
+    if (!_isDisposed) {
+      super.notifyListeners();
+    }
+  }
+
+  @override
   void dispose() {
+    _isDisposed = true;
     _escalationTimer?.cancel();
     _receivePort?.close();
     IsolateNameServer.removePortNameMapping(AlarmService.isolatePortName);

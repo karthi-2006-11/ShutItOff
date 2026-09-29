@@ -14,16 +14,21 @@ class SocketHub extends ChangeNotifier {
   static const int defaultPort = 8080;
   static const String eventAlarmRinging = 'ALARM_RINGING';
   static const String eventRemoteDismiss = 'REMOTE_DISMISS';
+  static const String eventRemoteSnooze = 'REMOTE_SNOOZE';
   static const String eventAlarmEscalated = 'ALARM_ESCALATED';
   static const String eventForceWake = 'FORCE_WAKE';
 
   HttpServer? _server;
-  final Set<WebSocket> _serverSockets = {};
+  // Step 2 Requirement: Active tracker array list maintaining multi-client connections
+  final List<WebSocket> _connectedClients = [];
   WebSocket? _peerSocket;
 
   bool isServerRunning = false;
   bool isConnectedToPeer = false;
   String? connectedPeerIp;
+
+  int get connectedClientCount => _connectedClients.length;
+  List<WebSocket> get connectedClients => List.unmodifiable(_connectedClients);
 
   void Function(String event, Map<String, dynamic> payload)? onEventReceived;
 
@@ -46,7 +51,9 @@ class SocketHub extends ChangeNotifier {
           if (WebSocketTransformer.isUpgradeRequest(request)) {
             try {
               final socket = await WebSocketTransformer.upgrade(request);
-              _serverSockets.add(socket);
+              // Capture and track incoming multi-client connection
+              _connectedClients.add(socket);
+              notifyListeners();
 
               // Immediately sync active alarm state to newly tethered roommate
               final initialPayload = {
@@ -57,8 +64,15 @@ class SocketHub extends ChangeNotifier {
 
               socket.listen(
                 (dynamic data) => _handleIncomingData(data),
-                onDone: () => _serverSockets.remove(socket),
-                onError: (_) => _serverSockets.remove(socket),
+                onDone: () {
+                  // Cleanse list automatically when a socket drops out
+                  _connectedClients.remove(socket);
+                  notifyListeners();
+                },
+                onError: (_) {
+                  _connectedClients.remove(socket);
+                  notifyListeners();
+                },
               );
             } catch (_) {}
           } else {
@@ -117,10 +131,22 @@ class SocketHub extends ChangeNotifier {
     _sendJsonPayload(payload);
   }
 
-  void sendRemoteDismiss([int? alarmId]) {
+  void sendRemoteDismiss([int? alarmId, String? actorName]) {
     final payload = {
       'event': eventRemoteDismiss,
       'alarm_id': alarmId,
+      'actor_name': ?actorName,
+      'timestamp': DateTime.now().toIso8601String(),
+    };
+    _sendJsonPayload(payload);
+  }
+
+  void sendRemoteSnooze([int? alarmId, String? actorName, int minutes = 5]) {
+    final payload = {
+      'event': eventRemoteSnooze,
+      'alarm_id': alarmId,
+      'actor_name': ?actorName,
+      'minutes': minutes,
       'timestamp': DateTime.now().toIso8601String(),
     };
     _sendJsonPayload(payload);
@@ -153,8 +179,9 @@ class SocketHub extends ChangeNotifier {
       _peerSocket!.add(encoded);
     }
 
-    // Broadcast to all connected clients if we are host
-    for (final client in _serverSockets) {
+    // Step 2 Requirement: Concurrently broadcast to all active multi-client array connections
+    final activeClients = List<WebSocket>.from(_connectedClients);
+    for (final client in activeClients) {
       if (client.readyState == WebSocket.open) {
         client.add(encoded);
       }
@@ -166,10 +193,11 @@ class SocketHub extends ChangeNotifier {
       final parsed = jsonDecode(rawData.toString()) as Map<String, dynamic>;
       final event = parsed['event'] as String?;
 
-      // STRICT PROTOCOL REQUIREMENT: Listen and act ONLY upon ALARM_RINGING, REMOTE_DISMISS, ALARM_ESCALATED, FORCE_WAKE
+      // STRICT PROTOCOL REQUIREMENT: Listen and act ONLY upon recognized room protocol events
       if (event != null &&
           (event == eventAlarmRinging ||
               event == eventRemoteDismiss ||
+              event == eventRemoteSnooze ||
               event == eventAlarmEscalated ||
               event == eventForceWake)) {
         onEventReceived?.call(event, parsed);
@@ -181,10 +209,11 @@ class SocketHub extends ChangeNotifier {
 
   Future<void> stopServer() async {
     try {
-      for (final client in _serverSockets) {
+      final activeClients = List<WebSocket>.from(_connectedClients);
+      for (final client in activeClients) {
         await client.close();
       }
-      _serverSockets.clear();
+      _connectedClients.clear();
       if (_server != null) {
         await _server!.close(force: true);
         _server = null;
